@@ -28,6 +28,13 @@ define Package/iw
   DEPENDS:= +libnl-tiny
 endef
 
+define Package/iw-full
+  $(Package/iw)
+  TITLE += (full version)
+  VARIANT:=full
+  PROVIDES:=iw
+endef
+
 define Build/Configure
 	echo "const char iw_version[] = \"$(PKG_VERSION)\";" > $(PKG_BUILD_DIR)/version.c
 	rm -f $(PKG_BUILD_DIR)/version.sh
@@ -43,6 +50,11 @@ TARGET_CPPFLAGS:= \
 	$(TARGET_CPPFLAGS) \
 	-DCONFIG_LIBNL20 \
 	-D_GNU_SOURCE
+
+ifeq ($(BUILD_VARIANT),full)
+  TARGET_CPPFLAGS += -DIW_FULL
+  MAKE_FLAGS += IW_FULL=1
+endif
 
 MAKE_FLAGS += \
 	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -ffunction-sections -fdata-sections" \

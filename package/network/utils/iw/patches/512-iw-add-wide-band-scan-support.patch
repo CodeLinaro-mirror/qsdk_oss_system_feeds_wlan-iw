@@ -91,7 +91,7 @@
  	if (flags)
  		NLA_PUT_U32(msg, NL80211_ATTR_SCAN_FLAGS, flags);
  	if (duration)
-@@ -2346,20 +2368,24 @@ static int handle_scan_combined(struct n
+@@ -2358,20 +2380,24 @@ static int handle_scan_combined(struct n
  	dump_argv[0] = argv[0];
  	return handle_cmd(state, id, dump_argc, dump_argv);
  }

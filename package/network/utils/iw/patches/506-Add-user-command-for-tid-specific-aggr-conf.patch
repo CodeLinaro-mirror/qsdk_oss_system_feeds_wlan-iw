@@ -1,6 +1,6 @@
 --- a/interface.c
 +++ b/interface.c
-@@ -803,3 +803,68 @@ nla_put_failure:
+@@ -802,3 +802,68 @@ nla_put_failure:
  COMMAND(set, tid_retry_count, "tid <tid> <[peer <MAC address>] short <limit> long <limit>]>",
  		NL80211_CMD_SET_TID_CONFIG, 0, CIB_NETDEV, handle_retry_count,
  		"Set the retry count for the TIDs ");

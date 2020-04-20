@@ -7,7 +7,7 @@ Add channel attribure support for nl80211 message
 
 --- a/info.c
 +++ b/info.c
-@@ -177,13 +177,18 @@ static int print_phy_handler(struct nl_m
+@@ -180,13 +180,18 @@ static int print_phy_handler(struct nl_m
  					band_had_freq = true;
  				}
  				nla_for_each_nested(nl_freq, tb_band[NL80211_BAND_ATTR_FREQS], rem_freq) {
