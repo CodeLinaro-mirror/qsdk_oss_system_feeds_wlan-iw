@@ -1,0 +1,156 @@
+From 425d5dc9c6eb218eec977d11d70dc85b7e74acb2 Mon Sep 17 00:00:00 2001
+From: John Crispin <john@phrozen.org>
+Date: Wed, 15 Jul 2020 18:10:36 -0700
+Subject: [PATCH 2/2] iw: Match netlink attributes
+
+Signed-off-by: John Crispin <john@phrozen.org>
+Signed-off-by: Aloka Dixit <alokad@codeaurora.org>
+---
+ nl80211.h | 101 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 100 insertions(+), 1 deletion(-)
+
+diff --git a/nl80211.h b/nl80211.h
+index 17386c0d8c8f..f6212fbebff6 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -2390,6 +2390,53 @@ enum nl80211_commands {
+  * @NL80211_ATTR_MAX_RETRY_COUNT: The upper limit for the retry count
+  *	configuration that the driver can accept.
+  *
++ * @NL80211_ATTR_PMK_REAUTH_THRESHOLD: Reauthentication threshold time, in
++ *      terms of percentage of %NL80211_ATTR_PMK_LIFETIME
++ *      (u8, dot11RSNAConfigPMKReauthThreshold, 1..100). This is an optional
++ *      parameter configured through %NL80211_CMD_SET_PMKSA. Requests the
++ *      driver to trigger a full authentication roam (without PMKSA caching)
++ *      after the reauthentication threshold time, but before the PMK lifetime
++ *      has expired.
++ *
++ *      Authentication methods like SAE need to be able to generate a new PMKSA
++ *      entry without having to force a disconnection after the PMK timeout. If
++ *      no roaming occurs between the reauth threshold and PMK expiration,
++ *      disassociation is still forced.
++ *
++ * @NL80211_ATTR_RECEIVE_MULTICAST: multicast flag for the
++ *      %NL80211_CMD_REGISTER_FRAME command, see the description there.
++ * @NL80211_ATTR_WIPHY_FREQ_OFFSET: offset of the associated
++ *      %NL80211_ATTR_WIPHY_FREQ in positive KHz. Only valid when supplied with
++ *      an %NL80211_ATTR_WIPHY_FREQ_OFFSET.
++ * @NL80211_ATTR_CENTER_FREQ1_OFFSET: Center frequency offset in KHz for the
++ *      first channel segment specified in %NL80211_ATTR_CENTER_FREQ1.
++ * @NL80211_ATTR_SCAN_FREQ_KHZ: nested attribute with KHz frequencies
++ *
++ * @NL80211_ATTR_HE_6GHZ_CAPABILITY: HE 6 GHz Band Capability element (from
++ *      association request when used with NL80211_CMD_NEW_STATION).
++ *
++ * @NL80211_ATTR_HE_MUEDCA_PARAMS: MU-EDCA AC parameters for the
++ *      %NL80211_CMD_UPDATE_HE_MUEDCA_PARAMS command.
++ *
++ * @NL80211_ATTR_FILS_DISCOVERY: Optional parameter to configure FILS
++ *      discovery. It is a nested attribute, see
++ *      &enum nl80211_fils_discovery_attributes.
++ *
++ * @NL80211_ATTR_UNSOL_BCAST_PROBE_RESP: Optional parameter to configure
++ *      unsolicited broadcast probe response. It is a nested attribute, see
++ *      &enum nl80211_unsol_bcast_probe_resp_attributes.
++ *
++ * @NL80211_ATTR_MULTI_BSSID_MODE: Set the (Non-)Transmitted flag for this
++ *      BSSIDs beacon.
++ *
++ * @NL80211_ATTR_MULTI_BSSID_PARENT: If this is a Non-Transmitted BSSID, define
++ *      the parent interface.
++ *
++ * @NL80211_ATTR_MULTI_BSSID_INDEX: The index of this BSS inside the multi bssid
++ *      IE.
++ *
++ * @NL80211_ATTR_MULTI_BSSID_COUNT: The number of BSSs inside the multi bssid IE.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -2854,10 +2901,33 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_VLAN_ID,
+ 
++	NL80211_ATTR_HE_BSS_COLOR,
++
++	NL80211_ATTR_IFTYPE_AKM_SUITES,
++
+ 	NL80211_ATTR_TID_CONFIG,
+ 	NL80211_ATTR_MAX_RETRY_COUNT,
+ 
+ 	NL80211_ATTR_WIPHY_ANTENNA_GAIN,
++	NL80211_ATTR_PMK_REAUTH_THRESHOLD,
++
++	NL80211_ATTR_RECEIVE_MULTICAST,
++	NL80211_ATTR_WIPHY_FREQ_OFFSET,
++	NL80211_ATTR_CENTER_FREQ1_OFFSET,
++	NL80211_ATTR_SCAN_FREQ_KHZ,
++
++	NL80211_ATTR_HE_6GHZ_CAPABILITY,
++
++	NL80211_ATTR_HE_MUEDCA_PARAMS,
++
++	NL80211_ATTR_FILS_DISCOVERY,
++
++	NL80211_ATTR_UNSOL_BCAST_PROBE_RESP,
++
++	NL80211_ATTR_MULTI_BSSID_MODE,
++	NL80211_ATTR_MULTI_BSSID_PARENT,
++	NL80211_ATTR_MULTI_BSSID_INDEX,
++	NL80211_ATTR_MULTI_BSSID_COUNT,
+ 
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+@@ -4648,6 +4718,7 @@ enum nl80211_ps_state {
+ 	NL80211_PS_DISABLED,
+ 	NL80211_PS_ENABLED,
+ };
++
+ /*
+  * @NL80211_ATTR_TID: a TID value (u8 attribute)
+  * @NL80211_ATTR_TID_RETRY_CONFIG: Data frame retry count should be
+@@ -6558,6 +6629,35 @@ enum nl80211_peer_measurement_ftm_failure_reasons {
+ 	NL80211_PMSR_FTM_FAILURE_BAD_CHANGED_PARAMS,
+ };
+ 
++/**
++ * enum nl80211_multi_bssid_mode - Multiple BSSID beacon type
++ *
++ * Used by cfg80211_ap_settings
++ *
++ * @MULTIPLE_BSSID_LEGACY: This BSS is not part of a multiple BSSID group
++ * @MULTIPLE_BSSID_TRANSMITTED: This BSS is broadcasting a multiple BSSID
++ *                                    beacon
++ * @MULTIPLE_BSSID_NON_TRANSMITTED: This BSS is not broadcasting a beacon
++ */
++enum nl80211_multi_bssid_mode {
++	NL80211_MULTIPLE_BSSID_LEGACY = 0,
++	NL80211_MULTIPLE_BSSID_TRANSMITTED,
++	NL80211_MULTIPLE_BSSID_NON_TRANSMITTED,
++};
++
++/**
++ * enum nl80211_beacon_tx_mode - Beacon tx mode settings
++ *
++ * @BEACON_TX_MODE_DEFAULT: The beacons shall be sent out in its default mode
++ * @BEACON_TX_MODE_STAGGERED: The beacons shall be sent out in staggered mode
++ * @BEACON_TX_MODE_BURST: The beacons shall be sent out in burst mode
++ *                                    beacon
++ */
++enum nl80211_beacon_tx_mode {
++	NL80211_BEACON_TX_MODE_STAGGERED = 0,
++	NL80211_BEACON_TX_MODE_BURST,
++};
++
+ /**
+  * enum nl80211_peer_measurement_ftm_resp - FTM response attributes
+  * @__NL80211_PMSR_FTM_RESP_ATTR_INVALID: invalid
+@@ -6664,5 +6764,4 @@ enum nl80211_obss_pd_attributes {
+ 	NL80211_HE_OBSS_PD_ATTR_MAX = __NL80211_HE_OBSS_PD_ATTR_LAST - 1,
+ };
+ 
+-
+ #endif /* __LINUX_NL80211_H */
+-- 
+2.25.0
+
