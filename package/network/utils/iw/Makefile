@@ -42,7 +42,7 @@ define Build/Configure
 	chmod +x $(PKG_BUILD_DIR)/version.sh
 endef
 
-TARGET_CFLAGS += -fpie
+TARGET_CFLAGS += -fpie -Wall -Werror
 TARGET_LDFLAGS += -pie
 
 TARGET_CPPFLAGS:= \
