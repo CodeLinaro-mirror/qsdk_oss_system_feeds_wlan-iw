@@ -224,7 +224,7 @@
  {
 --- a/scan.c
 +++ b/scan.c
-@@ -561,6 +561,7 @@ static void print_ssid(const uint8_t typ
+@@ -559,6 +559,7 @@ static void print_ssid(const uint8_t typ
  #define BSS_MEMBERSHIP_SELECTOR_VHT_PHY 126
  #define BSS_MEMBERSHIP_SELECTOR_HT_PHY 127
  
@@ -232,7 +232,7 @@
  static void print_supprates(const uint8_t type, uint8_t len,
  			    const uint8_t *data,
  			    const struct print_ies_data *ie_buffer)
-@@ -678,6 +679,7 @@ static void print_erp(const uint8_t type
+@@ -676,6 +677,7 @@ static void print_erp(const uint8_t type
  		printf(" Barker_Preamble_Mode");
  	printf("\n");
  }
@@ -240,7 +240,22 @@
  
  static void print_cipher(const uint8_t *data)
  {
-@@ -1018,6 +1020,7 @@ static void print_ht_capa(const uint8_t
+@@ -993,12 +995,14 @@ static void print_rsn_ie(const char *def
+ 	_print_rsn_ie(defcipher, defauth, len, data, 0);
+ }
+ 
++#ifdef IW_FULL
+ static void print_osen_ie(const char *defcipher, const char *defauth,
+ 			  uint8_t len, const uint8_t *data)
+ {
+ 	printf("\n\t");
+ 	_print_rsn_ie(defcipher, defauth, len, data, 1);
+ }
++#endif
+ 
+ static void print_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
+ 		      const struct print_ies_data *ie_buffer)
+@@ -1016,6 +1020,7 @@ static void print_ht_capa(const uint8_t
  	print_ht_mcs(data + 3);
  }
  
@@ -248,7 +263,7 @@
  static const char* ntype_11u(uint8_t t)
  {
  	switch (t) {
-@@ -1170,6 +1173,7 @@ static void print_11u_rcon(const uint8_t
+@@ -1168,6 +1173,7 @@ static void print_11u_rcon(const uint8_t
  		}
  	}
  }
@@ -256,7 +271,7 @@
  
  static const char *ht_secondary_offset[4] = {
  	"no secondary",
-@@ -1197,6 +1201,7 @@ static void print_ht_op(const uint8_t ty
+@@ -1195,6 +1201,7 @@ static void print_ht_op(const uint8_t ty
  	printf("\t\t * secondary channel offset: %s\n",
  		ht_secondary_offset[data[1] & 0x3]);
  	printf("\t\t * STA channel width: %s\n", sta_chan_width[(data[1] & 0x4)>>2]);
@@ -264,7 +279,7 @@
  	printf("\t\t * RIFS: %d\n", (data[1] & 0x8)>>3);
  	printf("\t\t * HT protection: %s\n", protection[data[2] & 0x3]);
  	printf("\t\t * non-GF present: %d\n", (data[2] & 0x4) >> 2);
-@@ -1209,6 +1214,7 @@ static void print_ht_op(const uint8_t ty
+@@ -1207,6 +1214,7 @@ static void print_ht_op(const uint8_t ty
  	printf("\t\t * PCO phase: %d\n", (data[5] & 0x8) >> 3);
  }
  
@@ -272,7 +287,7 @@
  static void print_capabilities(const uint8_t type, uint8_t len,
  			       const uint8_t *data,
  			       const struct print_ies_data *ie_buffer)
-@@ -1386,6 +1392,7 @@ static void print_ibssatim(const uint8_t
+@@ -1384,6 +1392,7 @@ static void print_ibssatim(const uint8_t
  {
  	printf(" %d TUs\n", (data[1] << 8) + data[0]);
  }
@@ -280,7 +295,7 @@
  
  static void print_vht_capa(const uint8_t type, uint8_t len, const uint8_t *data,
  			   const struct print_ies_data *ie_buffer)
-@@ -1414,6 +1421,7 @@ static void print_vht_oper(const uint8_t
+@@ -1412,6 +1421,7 @@ static void print_vht_oper(const uint8_t
  	printf("\t\t * VHT basic MCS set: 0x%.2x%.2x\n", data[4], data[3]);
  }
  
@@ -288,7 +303,7 @@
  static void print_obss_scan_params(const uint8_t type, uint8_t len,
  				   const uint8_t *data,
  				   const struct print_ies_data *ie_buffer)
-@@ -1428,6 +1436,7 @@ static void print_obss_scan_params(const
+@@ -1426,6 +1436,7 @@ static void print_obss_scan_params(const
  	printf("\t\t * OBSS Scan Activity Threshold: %d.%02d %%\n",
  		((data[13] << 8) | data[12]) / 100, ((data[13] << 8) | data[12]) % 100);
  }
@@ -296,7 +311,7 @@
  
  static void print_secchan_offs(const uint8_t type, uint8_t len,
  			       const uint8_t *data,
-@@ -1439,6 +1448,7 @@ static void print_secchan_offs(const uin
+@@ -1437,6 +1448,7 @@ static void print_secchan_offs(const uin
  		printf(" %d\n", data[0]);
  }
  
@@ -304,7 +319,7 @@
  static void print_bss_load(const uint8_t type, uint8_t len, const uint8_t *data,
  			   const struct print_ies_data *ie_buffer)
  {
-@@ -1480,6 +1490,7 @@ static void print_mesh_conf(const uint8_
+@@ -1478,6 +1490,7 @@ static void print_mesh_conf(const uint8_
  	if (data[6] & 0x40)
  		printf("\t\t\t Mesh Power Save Level\n");
  }
@@ -312,7 +327,7 @@
  
  struct ie_print {
  	const char *name;
-@@ -1524,6 +1535,13 @@ static void print_ie(const struct ie_pri
+@@ -1522,6 +1535,13 @@ static void print_ie(const struct ie_pri
  
  static const struct ie_print ieprinters[] = {
  	[0] = { "SSID", print_ssid, 0, 32, BIT(PRINT_SCAN) | BIT(PRINT_LINK), },
@@ -326,7 +341,7 @@
  	[1] = { "Supported rates", print_supprates, 0, 255, BIT(PRINT_SCAN), },
  	[3] = { "DS Parameter set", print_ds, 1, 1, BIT(PRINT_SCAN), },
  	[5] = { "TIM", print_tim, 4, 255, BIT(PRINT_SCAN), },
-@@ -1533,14 +1551,8 @@ static const struct ie_print ieprinters[
+@@ -1531,14 +1551,8 @@ static const struct ie_print ieprinters[
  	[32] = { "Power constraint", print_powerconstraint, 1, 1, BIT(PRINT_SCAN), },
  	[35] = { "TPC report", print_tpcreport, 2, 2, BIT(PRINT_SCAN), },
  	[42] = { "ERP", print_erp, 1, 255, BIT(PRINT_SCAN), },
@@ -341,23 +356,34 @@
  	[50] = { "Extended supported rates", print_supprates, 0, 255, BIT(PRINT_SCAN), },
  	[113] = { "MESH Configuration", print_mesh_conf, 7, 7, BIT(PRINT_SCAN), },
  	[114] = { "MESH ID", print_ssid, 0, 32, BIT(PRINT_SCAN) | BIT(PRINT_LINK), },
-@@ -1548,6 +1560,7 @@ static const struct ie_print ieprinters[
+@@ -1546,8 +1560,10 @@ static const struct ie_print ieprinters[
  	[107] = { "802.11u Interworking", print_interworking, 0, 255, BIT(PRINT_SCAN), },
  	[108] = { "802.11u Advertisement", print_11u_advert, 0, 255, BIT(PRINT_SCAN), },
  	[111] = { "802.11u Roaming Consortium", print_11u_rcon, 0, 255, BIT(PRINT_SCAN), },
 +#endif
  };
  
++#ifdef IW_FULL
  static void print_wifi_wpa(const uint8_t type, uint8_t len, const uint8_t *data,
-@@ -1954,6 +1967,7 @@ static const struct ie_print wfa_printer
- 	[28] = { "OWE Transition Mode", print_wifi_owe_tarns, 7, 255, BIT(PRINT_SCAN), },
+ 			   const struct print_ies_data *ie_buffer)
+ {
+@@ -1822,6 +1838,7 @@ static const struct ie_print wifiprinter
+ 	[2] = { "WMM", print_wifi_wmm, 1, 255, BIT(PRINT_SCAN), },
+ 	[4] = { "WPS", print_wifi_wps, 0, 255, BIT(PRINT_SCAN), },
  };
++#endif
+ 
+ static inline void print_p2p(const uint8_t type, uint8_t len,
+ 			     const uint8_t *data,
+@@ -1917,6 +1934,7 @@ static inline void print_hs20_ind(const
+ 		printf("\t\tUnexpected length: %i\n", len);
+ }
  
 +#ifdef IW_FULL
- static void print_vendor(unsigned char len, unsigned char *data,
- 			 bool unknown, enum print_ie_type ptype)
- {
-@@ -2012,6 +2026,7 @@ static void print_vendor(unsigned char l
+ static void print_wifi_owe_tarns(const uint8_t type, uint8_t len,
+ 				 const uint8_t *data,
+ 				 const struct print_ies_data *ie_buffer)
+@@ -2010,6 +2028,7 @@ static void print_vendor(unsigned char l
  		printf(" %.2x", data[i]);
  	printf("\n");
  }
@@ -365,7 +391,7 @@
  
  void print_ies(unsigned char *ie, int ielen, bool unknown,
  	       enum print_ie_type ptype)
-@@ -2026,6 +2041,7 @@ void print_ies(unsigned char *ie, int ie
+@@ -2024,6 +2043,7 @@ void print_ies(unsigned char *ie, int ie
  		    ieprinters[ie[0]].flags & BIT(ptype)) {
  			print_ie(&ieprinters[ie[0]],
  				 ie[0], ie[1], ie + 2, &ie_buffer);
@@ -373,7 +399,7 @@
  		} else if (ie[0] == 221 /* vendor */) {
  			print_vendor(ie[1], ie + 2, unknown, ptype);
  		} else if (unknown) {
-@@ -2035,6 +2051,7 @@ void print_ies(unsigned char *ie, int ie
+@@ -2033,6 +2053,7 @@ void print_ies(unsigned char *ie, int ie
  			for (i=0; i<ie[1]; i++)
  				printf(" %.2x", ie[2+i]);
  			printf("\n");
@@ -381,7 +407,7 @@
  		}
  		ielen -= ie[1] + 2;
  		ie += ie[1] + 2;
-@@ -2075,6 +2092,7 @@ static void print_capa_non_dmg(__u16 cap
+@@ -2073,6 +2094,7 @@ static void print_capa_non_dmg(__u16 cap
  		printf(" ESS");
  	if (capa & WLAN_CAPABILITY_IBSS)
  		printf(" IBSS");
@@ -389,7 +415,7 @@
  	if (capa & WLAN_CAPABILITY_CF_POLLABLE)
  		printf(" CfPollable");
  	if (capa & WLAN_CAPABILITY_CF_POLL_REQUEST)
-@@ -2103,6 +2121,7 @@ static void print_capa_non_dmg(__u16 cap
+@@ -2101,6 +2123,7 @@ static void print_capa_non_dmg(__u16 cap
  		printf(" DelayedBACK");
  	if (capa & WLAN_CAPABILITY_IMM_BACK)
  		printf(" ImmediateBACK");
@@ -397,7 +423,7 @@
  }
  
  static int print_bss_handler(struct nl_msg *msg, void *arg)
-@@ -2187,8 +2206,10 @@ static int print_bss_handler(struct nl_m
+@@ -2185,8 +2208,10 @@ static int print_bss_handler(struct nl_m
  	if (bss[NL80211_BSS_FREQUENCY]) {
  		int freq = nla_get_u32(bss[NL80211_BSS_FREQUENCY]);
  		printf("\tfreq: %d\n", freq);
@@ -416,9 +442,9 @@
  
 +#ifdef IW_FULL
  static const char *commands[NL80211_CMD_MAX + 1] = {
- /*
-  * sed 's%^\tNL80211_CMD_%%;t n;d;:n s%^\([^=]*\),.*%\t[NL80211_CMD_\1] = \"\L\1\",%;t;d' nl80211.h | grep -v "reserved"
-@@ -298,6 +299,7 @@ const char *command_name(enum nl80211_co
+ #include "nl80211-commands.inc"
+ };
+@@ -160,6 +161,7 @@ const char *command_name(enum nl80211_co
  	sprintf(cmdbuf, "Unknown command (%d)", cmd);
  	return cmdbuf;
  }
