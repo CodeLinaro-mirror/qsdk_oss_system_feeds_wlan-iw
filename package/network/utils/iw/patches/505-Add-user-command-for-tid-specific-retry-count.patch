@@ -1,3 +1,5 @@
+diff --git a/interface.c b/interface.c
+index 89c95a9ac4ab..506151002fae 100644
 --- a/interface.c
 +++ b/interface.c
 @@ -728,6 +728,81 @@ COMMAND(switch, freq,
@@ -82,27 +84,11 @@
  
  static int toggle_tid_param(const char *argv0, const char *argv1,
  			    struct nl_msg *msg, uint32_t attr)
+diff --git a/nl80211.h b/nl80211.h
+index b0ce8767ea25..998851d8f9e1 100644
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -2474,6 +2474,9 @@ enum nl80211_commands {
-  *	nested attribute with &enum nl80211_tid_config_attr sub-attributes;
-  *	on output (in wiphy attributes) it contains only the feature sub-
-  *	attributes.
-+ * @NL80211_ATTR_MAX_RETRY_COUNT: The upper limit for the retry count
-+ *	configuration that the driver can accept.
-+ *
-  *
-  * @NL80211_ATTR_CONTROL_PORT_NO_PREAUTH: disable preauth frame rx on control
-  *	port in order to forward/receive them as ordinary data frames.
-@@ -2999,6 +3002,7 @@ enum nl80211_attrs {
- 	NL80211_ATTR_IFTYPE_AKM_SUITES,
- 
- 	NL80211_ATTR_TID_CONFIG,
-+	NL80211_ATTR_MAX_RETRY_COUNT,
- 
- 	NL80211_ATTR_CONTROL_PORT_NO_PREAUTH,
- 
-@@ -4874,7 +4878,55 @@ enum nl80211_ps_state {
+@@ -4886,7 +4886,55 @@ enum nl80211_ps_state {
  	NL80211_PS_DISABLED,
  	NL80211_PS_ENABLED,
  };
