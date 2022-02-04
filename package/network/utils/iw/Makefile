@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=iw
-PKG_VERSION:=5.9
+PKG_VERSION:=5.16
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://www.kernel.org/pub/software/network/iw
-PKG_MD5SUM:=7a47d6f749ec69afcaf351166fd12f6f
+PKG_MD5SUM:=782a3460da2854bd2e5b8f96845a62f8
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@openwrt.org>
 PKG_LICENSE:=GPL-2.0
@@ -46,7 +46,7 @@ TARGET_CFLAGS += -fpie -Wall -Werror
 TARGET_LDFLAGS += -pie
 
 TARGET_CPPFLAGS:= \
-	-I$(STAGING_DIR)/usr/include/libnl-tiny \
+	-I$(STAGING_DIR)/usr/include/libnl-tiny\
 	$(TARGET_CPPFLAGS) \
 	-DCONFIG_LIBNL20 \
 	-D_GNU_SOURCE

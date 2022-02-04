@@ -1,0 +1,140 @@
+From 8ccb706cc7e5c8bc7cb37786197b99038a224bf1 Mon Sep 17 00:00:00 2001
+From: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
+Date: Mon, 7 Feb 2022 11:51:31 +0530
+Subject: [PATCH] iw: fix compilation issues from the pkg upgrade
+
+This patch fixes compilation issues identified locally for this iw-5.16
+
+Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
+---
+ Makefile | 20 ++++++++++----------
+ sar.c    |  9 +++++++++
+ scan.c   | 38 --------------------------------------
+ 3 files changed, 19 insertions(+), 48 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 2fb8db8..8bd5457 100644
+--- a/Makefile
++++ b/Makefile
+@@ -45,30 +45,30 @@ NLLIBNAME = libnl-1
+ endif
+ 
+ ifeq ($(NL2FOUND),Y)
+-override CFLAGS += -DCONFIG_LIBNL20
+-override LIBS += -lnl-genl
++CFLAGS += -DCONFIG_LIBNL20
++LIBS += -lnl-genl
+ NLLIBNAME = libnl-2.0
+ endif
+ 
+ ifeq ($(NL3xFOUND),Y)
+ # libnl 3.2 might be found as 3.2 and 3.0
+ NL3FOUND = N
+-override CFLAGS += -DCONFIG_LIBNL30
+-override LIBS += -lnl-genl-3
++CFLAGS += -DCONFIG_LIBNL30
++LIBS += -lnl-genl-3
+ NLLIBNAME = libnl-3.0
+ endif
+ 
+ ifeq ($(NL3FOUND),Y)
+-override CFLAGS += -DCONFIG_LIBNL30
+-override LIBS += -lnl-genl
++CFLAGS += -DCONFIG_LIBNL30
++LIBS += -lnl-genl
+ NLLIBNAME = libnl-3.0
+ endif
+ 
+ # nl-3.1 has a broken libnl-gnl-3.1.pc file
+ # as show by pkg-config --debug --libs --cflags --exact-version=3.1 libnl-genl-3.1;echo $?
+ ifeq ($(NL31FOUND),Y)
+-override CFLAGS += -DCONFIG_LIBNL30
+-override LIBS += -lnl-genl
++CFLAGS += -DCONFIG_LIBNL30
++LIBS += -lnl-genl
+ NLLIBNAME = libnl-3.1
+ endif
+ 
+@@ -76,8 +76,8 @@ ifeq ($(NLLIBNAME),)
+ $(error Cannot find development files for any supported version of libnl)
+ endif
+ 
+-override LIBS += $(shell $(PKG_CONFIG) --libs $(NLLIBNAME))
+-override CFLAGS += $(shell $(PKG_CONFIG) --cflags $(NLLIBNAME))
++LIBS += $(shell $(PKG_CONFIG) --libs $(NLLIBNAME))
++CFLAGS += $(shell $(PKG_CONFIG) --cflags $(NLLIBNAME))
+ endif # NO_PKG_CONFIG
+ 
+ ifeq ($(V),1)
+diff --git a/sar.c b/sar.c
+index 5ab54ec..95e36e4 100644
+--- a/sar.c
++++ b/sar.c
+@@ -8,6 +8,15 @@
+ #include "nl80211.h"
+ #include "iw.h"
+ 
++/**
++ * Add 16 bit integer attribute to netlink message.
++ * @arg msg		Netlink message.
++ * @arg attrtype	Attribute type.
++ * @arg value		Numeric value.
++ */
++#define NLA_PUT_S32(msg, attrtype, value) \
++	NLA_PUT_TYPE(msg, uint16_t, attrtype, value)
++
+ static int set_sar_specs(struct nl80211_state *state,
+ 			 struct nl_msg *msg,
+ 			 int argc, char **argv,
+diff --git a/scan.c b/scan.c
+index 8de3b2d..b3c3440 100644
+--- a/scan.c
++++ b/scan.c
+@@ -2315,44 +2315,6 @@ static void print_vendor(unsigned char len, unsigned char *data,
+ }
+ #endif
+ 
+-static void print_he_capa(const uint8_t type, uint8_t len, const uint8_t *data,
+-			  const struct print_ies_data *ie_buffer)
+-{
+-	printf("\n");
+-	print_he_capability(data, len);
+-}
+-
+-static const struct ie_print ext_printers[] = {
+-	[35] = { "HE capabilities", print_he_capa, 21, 54, BIT(PRINT_SCAN), },
+-};
+-
+-static void print_extension(unsigned char len, unsigned char *ie,
+-			    bool unknown, enum print_ie_type ptype)
+-{
+-	unsigned char tag;
+-
+-	if (len < 1) {
+-		printf("\tExtension IE: <empty>\n");
+-		return;
+-	}
+-
+-	tag = ie[0];
+-	if (tag < ARRAY_SIZE(ext_printers) && ext_printers[tag].name &&
+-	    ext_printers[tag].flags & BIT(ptype)) {
+-		print_ie(&ext_printers[tag], tag, len - 1, ie + 1, NULL);
+-		return;
+-	}
+-
+-	if (unknown) {
+-		int i;
+-
+-		printf("\tUnknown Extension ID (%d):", ie[0]);
+-		for (i = 1; i < len; i++)
+-			printf(" %.2x", ie[i]);
+-		printf("\n");
+-	}
+-}
+-
+ void print_ies(unsigned char *ie, int ielen, bool unknown,
+ 	       enum print_ie_type ptype)
+ {
+-- 
+2.7.4
+
