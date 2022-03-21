@@ -13,7 +13,53 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
 
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -3631,6 +3631,8 @@ enum nl80211_mpath_info {
+@@ -3139,6 +3139,8 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_DISABLE_HE,
+ 
++	NL80211_ATTR_HE_MUEDCA_PARAMS,
++
+ 	NL80211_ATTR_OBSS_COLOR_BITMAP,
+ 
+ 	NL80211_ATTR_COLOR_CHANGE_COUNT,
+@@ -3148,22 +3150,26 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_MBSSID_CONFIG,
+ 	NL80211_ATTR_MBSSID_ELEMS,
+ 
+-	NL80211_ATTR_HE_MUEDCA_PARAMS,
+-
+-	NL80211_ATTR_MULTIPLE_BSSID_PARENT,
+-	NL80211_ATTR_MULTIPLE_BSSID_INDEX,
+-	NL80211_ATTR_MULTIPLE_BSSID_COUNT,
+-	NL80211_ATTR_MULTIPLE_BSSID_IES,
+-	NL80211_ATTR_MULTIPLE_BSSID_EMA,
+-
+-	NL80211_ATTR_RNR_OFFSETS,
+-
+ 	NL80211_ATTR_BEACON_TX_MODE,
+ 
+ 	NL80211_ATTR_WIPHY_ANTENNA_GAIN,
+ 
+ 	NL80211_ATTR_STA_MGMT_RTS_CTS_CONFIG,
+ 
++	NL80211_ATTR_AWGN_INTERFERENCE_BITMAP,
++
++	NL80211_ATTR_6G_REG_POWER_MODE,
++
++	NL80211_ATTR_EMA_RNR_ELEMS,
++
++	NL80211_ATTR_EHT_CAPABILITY = NL80211_ATTR_MBSSID_ELEMS + 15,
++
++	NL80211_ATTR_DISABLE_EHT,
++
++	NL80211_ATTR_RU_PUNCT_SUPP_BW,
++	NL80211_ATTR_RU_PUNCT_SUPP_HE,
++	NL80211_ATTR_RU_PUNCT_BITMAP,
++
+ 	NL80211_ATTR_MLD_MAC=352,
+ 	NL80211_ATTR_MLD_REFERENCE=353,
+ 
+@@ -3746,6 +3752,8 @@ enum nl80211_mpath_info {
  	NL80211_MPATH_INFO_MAX = __NL80211_MPATH_INFO_AFTER_LAST - 1
  };
  
@@ -22,7 +68,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  /**
   * enum nl80211_band_iftype_attr - Interface type data attributes
   *
-@@ -4836,6 +4838,11 @@ enum nl80211_key_attributes {
+@@ -4954,6 +4962,11 @@ enum nl80211_key_attributes {
   *	see &struct nl80211_txrate_he
   * @NL80211_TXRATE_HE_GI: configure HE GI, 0.8us, 1.6us and 3.2us.
   * @NL80211_TXRATE_HE_LTF: configure HE LTF, 1XLTF, 2XLTF and 4XLTF.
@@ -34,7 +80,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
   * @__NL80211_TXRATE_AFTER_LAST: internal
   * @NL80211_TXRATE_MAX: highest TX rate attribute
   */
-@@ -4849,6 +4856,9 @@ enum nl80211_tx_rate_attributes {
+@@ -4967,6 +4980,9 @@ enum nl80211_tx_rate_attributes {
  	NL80211_TXRATE_HE_GI,
  	NL80211_TXRATE_HE_LTF,
  	NL80211_TXRATE_HE_UL,
@@ -44,7 +90,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	/* keep last */
  	__NL80211_TXRATE_AFTER_LAST,
-@@ -4882,6 +4892,38 @@ enum nl80211_txrate_gi {
+@@ -5000,6 +5016,38 @@ enum nl80211_txrate_gi {
  };
  
  /**
