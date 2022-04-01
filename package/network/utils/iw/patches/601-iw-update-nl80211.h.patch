@@ -59,7 +59,33 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  	NL80211_ATTR_MLD_MAC=352,
  	NL80211_ATTR_MLD_REFERENCE=353,
  
-@@ -3746,6 +3752,8 @@ enum nl80211_mpath_info {
+@@ -3429,6 +3435,13 @@ enum nl80211_he_ru_alloc {
+  * @NL80211_RATE_INFO_HE_DCM: HE DCM value (u8, 0/1)
+  * @NL80211_RATE_INFO_RU_ALLOC: HE RU allocation, if not present then
+  *	non-OFDMA was used (u8, see &enum nl80211_he_ru_alloc)
++ * @NL80211_RATE_INFO_320_MHZ_WIDTH: 320 MHz bitrate
++ * @NL80211_RATE_INFO_EHT_MCS: EHT MCS index (u8, 0-15)
++ * @NL80211_RATE_INFO_EHT_NSS: EHT NSS value (u8, 1-8)
++ * @NL80211_RATE_INFO_EHT_GI: EHT guard interval identifier
++ *      (u8, see &enum nl80211_eht_gi)
++ * @NL80211_RATE_INFO_EHT_RU_ALLOC: EHT RU allocation, if not present then
++ *      non-OFDMA was used (u8, see &enum nl80211_eht_ru_alloc)
+  * @__NL80211_RATE_INFO_AFTER_LAST: internal use
+  */
+ enum nl80211_rate_info {
+@@ -3450,6 +3463,11 @@ enum nl80211_rate_info {
+ 	NL80211_RATE_INFO_HE_GI,
+ 	NL80211_RATE_INFO_HE_DCM,
+ 	NL80211_RATE_INFO_HE_RU_ALLOC,
++	NL80211_RATE_INFO_320_MHZ_WIDTH,
++	NL80211_RATE_INFO_EHT_MCS,
++	NL80211_RATE_INFO_EHT_NSS,
++	NL80211_RATE_INFO_EHT_GI,
++	NL80211_RATE_INFO_EHT_RU_ALLOC,
+ 
+ 	/* keep last */
+ 	__NL80211_RATE_INFO_AFTER_LAST,
+@@ -3746,6 +3764,8 @@ enum nl80211_mpath_info {
  	NL80211_MPATH_INFO_MAX = __NL80211_MPATH_INFO_AFTER_LAST - 1
  };
  
@@ -68,7 +94,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  /**
   * enum nl80211_band_iftype_attr - Interface type data attributes
   *
-@@ -4954,6 +4962,11 @@ enum nl80211_key_attributes {
+@@ -4954,6 +4974,11 @@ enum nl80211_key_attributes {
   *	see &struct nl80211_txrate_he
   * @NL80211_TXRATE_HE_GI: configure HE GI, 0.8us, 1.6us and 3.2us.
   * @NL80211_TXRATE_HE_LTF: configure HE LTF, 1XLTF, 2XLTF and 4XLTF.
@@ -80,7 +106,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
   * @__NL80211_TXRATE_AFTER_LAST: internal
   * @NL80211_TXRATE_MAX: highest TX rate attribute
   */
-@@ -4967,6 +4980,9 @@ enum nl80211_tx_rate_attributes {
+@@ -4967,6 +4992,9 @@ enum nl80211_tx_rate_attributes {
  	NL80211_TXRATE_HE_GI,
  	NL80211_TXRATE_HE_LTF,
  	NL80211_TXRATE_HE_UL,
@@ -90,7 +116,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	/* keep last */
  	__NL80211_TXRATE_AFTER_LAST,
-@@ -5000,6 +5016,38 @@ enum nl80211_txrate_gi {
+@@ -5000,6 +5028,38 @@ enum nl80211_txrate_gi {
  };
  
  /**
