@@ -13,7 +13,25 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
 
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -3202,6 +3202,18 @@ enum nl80211_attrs {
+@@ -1481,6 +1481,17 @@ enum nl80211_commands {
+ 
+ 	NL80211_CMD_ASSOC_COMEBACK,
+ 
++	NL80211_CMD_ADD_LINK,
++	NL80211_CMD_REMOVE_LINK,
++
++	NL80211_CMD_ADD_LINK_STA,
++	NL80211_CMD_MODIFY_LINK_STA,
++	NL80211_CMD_REMOVE_LINK_STA,
++
++	NL80211_CMD_UPDATE_HE_MUEDCA_PARAMS,
++
++	NL80211_CMD_AWGN_DETECT,
++
+ 	/* add new commands above here */
+ 
+ 	/* used to define NL80211_CMD_MAX below */
+@@ -3202,6 +3213,18 @@ enum nl80211_attrs {
  
  	NL80211_ATTR_STA_MGMT_RTS_CTS_CONFIG,
  
@@ -32,7 +50,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  	/* add attributes here, update the policy in nl80211.c */
  
  	__NL80211_ATTR_AFTER_LAST,
-@@ -3845,6 +3857,8 @@ enum nl80211_mpath_info {
+@@ -3845,6 +3868,8 @@ enum nl80211_mpath_info {
  	NL80211_MPATH_INFO_MAX = __NL80211_MPATH_INFO_AFTER_LAST - 1
  };
  
@@ -41,7 +59,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  /**
   * enum nl80211_band_iftype_attr - Interface type data attributes
   *
-@@ -5074,6 +5088,11 @@ enum nl80211_key_attributes {
+@@ -5074,6 +5099,11 @@ enum nl80211_key_attributes {
   *	see &struct nl80211_txrate_he
   * @NL80211_TXRATE_HE_GI: configure HE GI, 0.8us, 1.6us and 3.2us.
   * @NL80211_TXRATE_HE_LTF: configure HE LTF, 1XLTF, 2XLTF and 4XLTF.
@@ -53,7 +71,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
   * @__NL80211_TXRATE_AFTER_LAST: internal
   * @NL80211_TXRATE_MAX: highest TX rate attribute
   */
-@@ -5087,6 +5106,9 @@ enum nl80211_tx_rate_attributes {
+@@ -5087,6 +5117,9 @@ enum nl80211_tx_rate_attributes {
  	NL80211_TXRATE_HE_GI,
  	NL80211_TXRATE_HE_LTF,
  	NL80211_TXRATE_HE_UL,
@@ -63,7 +81,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	/* keep last */
  	__NL80211_TXRATE_AFTER_LAST,
-@@ -5120,6 +5142,26 @@ enum nl80211_txrate_gi {
+@@ -5120,6 +5153,26 @@ enum nl80211_txrate_gi {
  };
  
  /**
