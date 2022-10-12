@@ -13,11 +13,9 @@ Signed-off-by: Sivashankari Madhavan <quic_sivamadh@quicinc.com>
  nl80211.h   |  5 ++++-
  2 files changed, 36 insertions(+), 1 deletion(-)
 
-Index: iw-5.16/interface.c
-===================================================================
---- iw-5.16.orig/interface.c
-+++ iw-5.16/interface.c
-@@ -1220,3 +1220,34 @@ COMMAND(set, tidconf, "[peer <MAC addres
+--- a/interface.c
++++ b/interface.c
+@@ -1199,3 +1199,34 @@ COMMAND(set, tidconf, "[peer <MAC addres
  	"  $ iw dev wlan0 set tidconf peer xx:xx:xx:xx:xx:xx tids 0x2 bitrates auto\n"
  	"  $ iw dev wlan0 set tidconf peer xx:xx:xx:xx:xx:xx tids 0x2 bitrates limit legacy-5 ht-mcs-5 vht-mcs-5 he-mcs-5 2:3\n"
  	);
@@ -52,11 +50,9 @@ Index: iw-5.16/interface.c
 +
 +COMMAND(set, ap_ps, "<Enable[1]/Disable[0]>",
 +                NL80211_CMD_UPDATE_AP, 0, CIB_NETDEV, handle_interface_ap_ps, NULL);
-Index: iw-5.16/nl80211.h
-===================================================================
---- iw-5.16.orig/nl80211.h
-+++ iw-5.16/nl80211.h
-@@ -1255,7 +1255,8 @@ enum nl80211_commands {
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -1260,7 +1260,8 @@ enum nl80211_commands {
  	NL80211_CMD_DEL_KEY,
  
  	NL80211_CMD_GET_BEACON,
@@ -66,12 +62,12 @@ Index: iw-5.16/nl80211.h
  	NL80211_CMD_START_AP,
  	NL80211_CMD_NEW_BEACON = NL80211_CMD_START_AP,
  	NL80211_CMD_STOP_AP,
-@@ -3170,6 +3171,8 @@ enum nl80211_attrs {
- 	NL80211_ATTR_RU_PUNCT_SUPP_HE,
+@@ -3214,6 +3215,8 @@ enum nl80211_attrs {
+ 
  	NL80211_ATTR_RU_PUNCT_BITMAP,
  
 +	NL80211_ATTR_AP_PS,
 +
- 	NL80211_ATTR_MLD_MAC=352,
- 	NL80211_ATTR_MLD_REFERENCE=353,
+ 	/* add attributes here, update the policy in nl80211.c */
  
+ 	__NL80211_ATTR_AFTER_LAST,
