@@ -24,7 +24,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
 -	if (mode == NL80211_TXRATE_HE) {
 +	if (mode == NL80211_TXRATE_EHT) {
-+		max_mcs = 13;
++		max_mcs = 15;
 +		max_nss = NL80211_EHT_NSS_MAX;
 +	} else if (mode == NL80211_TXRATE_HE) {
  		max_mcs = 11;
