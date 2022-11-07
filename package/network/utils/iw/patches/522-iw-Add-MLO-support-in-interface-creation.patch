@@ -51,7 +51,7 @@ index 57e2fe4..88b30e9 100644
  		NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, mac_addr);
  
 +	if (found_mld_mac)
-+		NLA_PUT(msg, NL80211_ATTR_MLD_MAC, ETH_ALEN, mld_mac_addr);
++		NLA_PUT(msg, NL80211_ATTR_MLD_ADDR, ETH_ALEN, mld_mac_addr);
 +
 +
  	return 0;
@@ -62,29 +62,15 @@ index 57e2fe4..88b30e9 100644
  		printf("%s\taddr %s\n", indent, mac_addr);
  	}
 +
-+	if (tb_msg[NL80211_ATTR_MLD_MAC]) {
++	if (tb_msg[NL80211_ATTR_MLD_ADDR]) {
 +		char mld_mac_addr[20];
-+		mac_addr_n2a(mld_mac_addr, nla_data(tb_msg[NL80211_ATTR_MLD_MAC]));
++		mac_addr_n2a(mld_mac_addr, nla_data(tb_msg[NL80211_ATTR_MLD_ADDR]));
 +		printf("%s\tmld_addr %s\n", indent, mld_mac_addr);
 +	}
 +
  	if (tb_msg[NL80211_ATTR_SSID]) {
  		printf("%s\tssid ", indent);
  		print_ssid_escaped(nla_len(tb_msg[NL80211_ATTR_SSID]),
-diff --git a/nl80211.h b/nl80211.h
-index 174851b..5654aca 100644
---- a/nl80211.h
-+++ b/nl80211.h
-@@ -3047,6 +3047,9 @@ enum nl80211_attrs {
- 
- 	NL80211_ATTR_WIPHY_ANTENNA_GAIN,
- 
-+	NL80211_ATTR_MLD_MAC=352,
-+	NL80211_ATTR_MLD_REFERENCE=353,
-+
- 	/* add attributes here, update the policy in nl80211.c */
- 
- 	__NL80211_ATTR_AFTER_LAST,
 -- 
 2.7.4
 
