@@ -13,7 +13,40 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
 
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -3139,6 +3139,8 @@ enum nl80211_attrs {
+@@ -1211,6 +1211,10 @@
+  *	passed using %NL80211_ATTR_SAR_SPEC. %NL80211_ATTR_WIPHY is used to
+  *	specify the wiphy index to be applied to.
+  *
++ * @NL80211_ATTR_HE_MUEDCA_PARAMS: MU-EDCA AC parameters for the
++ * 	%NL80211_CMD_UPDATE_HE_MUEDCA_PARAMS command in format described in
++ * 	P802.11ax_D4.0 section 9.4.2.245
++ *
+  * @NL80211_CMD_OBSS_COLOR_COLLISION: This notification is sent out whenever
+  *	mac80211/drv detects a bss color collision.
+  *
+@@ -1464,6 +1468,8 @@ enum nl80211_commands {
+ 
+ 	NL80211_CMD_SET_SAR_SPECS,
+ 
++	NL80211_CMD_UPDATE_HE_MUEDCA_PARAMS,
++
+ 	NL80211_CMD_OBSS_COLOR_COLLISION,
+ 
+ 	NL80211_CMD_COLOR_CHANGE_REQUEST,
+@@ -1472,8 +1478,12 @@ enum nl80211_commands {
+ 	NL80211_CMD_COLOR_CHANGE_ABORTED,
+ 	NL80211_CMD_COLOR_CHANGE_COMPLETED,
+ 
++	NL80211_CMD_AWGN_DETECT,
++
+ 	NL80211_CMD_SET_FILS_AAD,
+ 
++	NL80211_CMD_ASSOC_COMEBACK,
++
+ 	/* add new commands above here */
+ 
+ 	/* used to define NL80211_CMD_MAX below */
+@@ -3139,6 +3149,8 @@ enum nl80211_attrs {
  
  	NL80211_ATTR_DISABLE_HE,
  
@@ -22,7 +55,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  	NL80211_ATTR_OBSS_COLOR_BITMAP,
  
  	NL80211_ATTR_COLOR_CHANGE_COUNT,
-@@ -3148,15 +3150,9 @@ enum nl80211_attrs {
+@@ -3148,15 +3160,9 @@ enum nl80211_attrs {
  	NL80211_ATTR_MBSSID_CONFIG,
  	NL80211_ATTR_MBSSID_ELEMS,
  
@@ -40,7 +73,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	NL80211_ATTR_BEACON_TX_MODE,
  
-@@ -3164,6 +3160,20 @@ enum nl80211_attrs {
+@@ -3164,6 +3170,20 @@ enum nl80211_attrs {
  
  	NL80211_ATTR_STA_MGMT_RTS_CTS_CONFIG,
  
@@ -61,7 +94,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  	NL80211_ATTR_MLD_MAC=352,
  	NL80211_ATTR_MLD_REFERENCE=353,
  
-@@ -3429,6 +3439,13 @@ enum nl80211_he_ru_alloc {
+@@ -3429,6 +3449,13 @@ enum nl80211_he_ru_alloc {
   * @NL80211_RATE_INFO_HE_DCM: HE DCM value (u8, 0/1)
   * @NL80211_RATE_INFO_RU_ALLOC: HE RU allocation, if not present then
   *	non-OFDMA was used (u8, see &enum nl80211_he_ru_alloc)
@@ -75,7 +108,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
   * @__NL80211_RATE_INFO_AFTER_LAST: internal use
   */
  enum nl80211_rate_info {
-@@ -3450,6 +3467,11 @@ enum nl80211_rate_info {
+@@ -3450,6 +3477,11 @@ enum nl80211_rate_info {
  	NL80211_RATE_INFO_HE_GI,
  	NL80211_RATE_INFO_HE_DCM,
  	NL80211_RATE_INFO_HE_RU_ALLOC,
@@ -87,7 +120,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	/* keep last */
  	__NL80211_RATE_INFO_AFTER_LAST,
-@@ -3746,6 +3768,8 @@ enum nl80211_mpath_info {
+@@ -3746,6 +3778,8 @@ enum nl80211_mpath_info {
  	NL80211_MPATH_INFO_MAX = __NL80211_MPATH_INFO_AFTER_LAST - 1
  };
  
@@ -96,7 +129,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  /**
   * enum nl80211_band_iftype_attr - Interface type data attributes
   *
-@@ -4954,6 +4978,11 @@ enum nl80211_key_attributes {
+@@ -4954,6 +4988,11 @@ enum nl80211_key_attributes {
   *	see &struct nl80211_txrate_he
   * @NL80211_TXRATE_HE_GI: configure HE GI, 0.8us, 1.6us and 3.2us.
   * @NL80211_TXRATE_HE_LTF: configure HE LTF, 1XLTF, 2XLTF and 4XLTF.
@@ -108,7 +141,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
   * @__NL80211_TXRATE_AFTER_LAST: internal
   * @NL80211_TXRATE_MAX: highest TX rate attribute
   */
-@@ -4967,6 +4996,9 @@ enum nl80211_tx_rate_attributes {
+@@ -4967,6 +5006,9 @@ enum nl80211_tx_rate_attributes {
  	NL80211_TXRATE_HE_GI,
  	NL80211_TXRATE_HE_LTF,
  	NL80211_TXRATE_HE_UL,
@@ -118,7 +151,7 @@ Signed-off-by: Muna Sinada <quic_msinada@quicinc.com>
  
  	/* keep last */
  	__NL80211_TXRATE_AFTER_LAST,
-@@ -5000,6 +5032,38 @@ enum nl80211_txrate_gi {
+@@ -5000,6 +5042,38 @@ enum nl80211_txrate_gi {
  };
  
  /**
