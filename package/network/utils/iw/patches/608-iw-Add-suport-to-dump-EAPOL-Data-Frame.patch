@@ -1,0 +1,165 @@
+From 1e5c893f38ce167507f8ed59028b36afea259bbd Mon Sep 17 00:00:00 2001
+From: Hari <quic_hag@quicinc.com>
+Date: Thu, 29 Dec 2022 15:04:09 +0530
+Subject: [PATCH] iw: Add suport to dump EAPOL Data Frame
+
+Introduce a new command  option to dump Eapol data
+frame in iw utility with the help of
+NL80211_CMD_CONTROL_PORT_FRAME_TX_STATUS
+command received from the driver.
+Usage: iw event -fe
+
+Signed-off-by: Hari <quic_hag@quicinc.com>
+---
+ event.c   | 44 ++++++++++++++++++++++++++++++++++++++------
+ iw.h      | 13 ++++++++++++-
+ nl80211.h |  2 +-
+ 3 files changed, 51 insertions(+), 8 deletions(-)
+
+diff --git a/event.c b/event.c
+index c1cd05c..4a4730f 100644
+--- a/event.c
++++ b/event.c
+@@ -43,9 +43,9 @@ static int parse_beacon_hint_chan(struct nlattr *tb,
+ 	return 0;
+ }
+ 
+-#ifdef IW_FULL
+ static void print_frame(struct print_event_args *args, struct nlattr *attr)
+ {
++	uint16_t eapol_key_info=0xffff;
+ 	uint8_t *frame;
+ 	size_t len;
+ 	unsigned int i;
+@@ -93,9 +93,29 @@ static void print_frame(struct print_event_args *args, struct nlattr *attr)
+ 		break;
+ 	}
+ 
+-	if (!args->frame)
++	if (!args->frame && !args->eapol_frame)
+ 		return;
+ 
++	if (args->eapol_frame) {
++	    eapol_key_info = ((frame[19] << 8) + frame[20]);
++	    switch (eapol_key_info) {
++	    case EAPOL_M1:
++		        printf("\n%s\n", EAPOL_M1_DUMP);
++			break;
++	    case EAPOL_M2:
++			printf("\n%s\n", EAPOL_M2_DUMP);
++			break;
++	    case EAPOL_M3:
++		        printf("\n%s\n", EAPOL_M3_DUMP);
++			break;
++	    case EAPOL_M4:
++			printf("\n%s\n", EAPOL_M4_DUMP);
++			break;
++	    default:
++			printf("\n%s\n", EAPOL_UNDEFINED);
++	    }
++	}
++
+ 	printf(" [frame:");
+ 
+  print_frame:
+@@ -103,7 +123,7 @@ static void print_frame(struct print_event_args *args, struct nlattr *attr)
+ 		printf(" %.02x", frame[i]);
+ 	printf("]");
+ }
+-
++#ifdef IW_FULL
+ static void parse_cqm_event(struct nlattr **attrs)
+ {
+ 	static struct nla_policy cqm_policy[NL80211_ATTR_CQM_MAX + 1] = {
+@@ -1193,11 +1213,20 @@ static int print_event(struct nl_msg *msg, void *arg)
+ 			(unsigned long long)nla_get_u64(tb[NL80211_ATTR_COOKIE]),
+ 			tb[NL80211_ATTR_ACK] ? "acked" : "no ack");
+ 		break;
++#endif
+ 	case NL80211_CMD_CONTROL_PORT_FRAME_TX_STATUS:
++		if (tb[NL80211_ATTR_FRAME] && args->eapol_frame)
++		    print_frame(args, tb[NL80211_ATTR_FRAME]);
++		else if (tb[NL80211_ATTR_TIMED_OUT])
++		    printf(": timed out");
++		else
++		    printf(": unknown event");
++		printf("\n");
+ 		printf("ctrl. port TX status (cookie %llx): %s\n",
+ 			(unsigned long long)nla_get_u64(tb[NL80211_ATTR_COOKIE]),
+ 			tb[NL80211_ATTR_ACK] ? "acked" : "no ack");
+ 		break;
++#ifdef IW_FULL
+ 	case NL80211_CMD_PMKSA_CANDIDATE:
+ 		printf("PMKSA candidate found\n");
+ 		break;
+@@ -1440,7 +1469,9 @@ static int print_events(struct nl80211_state *state,
+ 	while (argc > 0) {
+ 		if (strcmp(argv[0], "-f") == 0)
+ 			args.frame = true;
+-		else if (strcmp(argv[0], "-t") == 0) {
++		else if (strcmp(argv[0], "-fe") == 0) {
++			args.eapol_frame = true;
++		} else if (strcmp(argv[0], "-t") == 0) {
+ 			num_time_formats++;
+ 			args.time = true;
+ 		} else if (strcmp(argv[0], "-T") == 0) {
+@@ -1467,9 +1498,10 @@ static int print_events(struct nl80211_state *state,
+ 
+ 	return __do_listen_events(state, 0, NULL, 0, NULL, &args);
+ }
+-TOPLEVEL(event, "[-t|-T|-r] [-f]", 0, 0, CIB_NONE, print_events,
++TOPLEVEL(event, "[-t|-T|-r] [-f|-fe]", 0, 0, CIB_NONE, print_events,
+ 	"Monitor events from the kernel.\n"
+ 	"-t - print timestamp\n"
+ 	"-T - print absolute, human-readable timestamp\n"
+ 	"-r - print relative timestamp\n"
+-	"-f - print full frame for auth/assoc etc.");
++	"-f - print full frame for auth/assoc etc.\n"
++	"-fe - print the EAPOL data frames");
+diff --git a/iw.h b/iw.h
+index ce74dec..f81ba91 100644
+--- a/iw.h
++++ b/iw.h
+@@ -47,6 +47,17 @@ enum nlmsgerr_attrs {
+ #  define nl_sock nl_handle
+ #endif
+ 
++#define EAPOL_M1 0x0088
++#define EAPOL_M2 0x0108
++#define EAPOL_M3 0x13c8
++#define EAPOL_M4 0x0308
++
++#define EAPOL_M1_DUMP "Dumping M1 Frame"
++#define EAPOL_M2_DUMP "Dumping M2 Frame"
++#define EAPOL_M3_DUMP "Dumping M3 Frame"
++#define EAPOL_M4_DUMP "Dumping M4 Frame"
++#define EAPOL_UNDEFINED "EAPOL DATA UNDEFINED"
++
+ struct nl80211_state {
+ 	struct nl_sock *nl_sock;
+ 	int nl80211_id;
+@@ -200,7 +211,7 @@ int handle_cmd(struct nl80211_state *state, enum id_input idby,
+ struct print_event_args {
+ 	struct timeval ts; /* internal */
+ 	bool have_ts; /* must be set false */
+-	bool frame, time, reltime, ctime;
++	bool frame, time, reltime, ctime, eapol_frame;
+ };
+ 
+ __u32 listen_events(struct nl80211_state *state,
+diff --git a/nl80211.h b/nl80211.h
+index 7072522..f321941 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -1461,7 +1461,7 @@ enum nl80211_commands {
+ 
+ 	NL80211_CMD_UNPROT_BEACON,
+ 
+-	NL80211_CMD_CONTROL_PORT_FRAME_TX_STATUS,
++	NL80211_CMD_CONTROL_PORT_FRAME_TX_STATUS = 140,
+ 
+ 	NL80211_CMD_SET_SAR_SPECS,
+ 
+-- 
+2.17.1
+
