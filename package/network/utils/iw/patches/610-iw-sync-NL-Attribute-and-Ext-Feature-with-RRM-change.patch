@@ -1,0 +1,93 @@
+From c9d3ed710064b8db1757ccc5fac03d3eb9a1a97a Mon Sep 17 00:00:00 2001
+From: Raj Kumar Bhagat <quic_rajkbhag@quicinc.com>
+Date: Thu, 26 Jan 2023 17:59:07 +0530
+Subject: [PATCH] iw: sync NL Attribute and Ext Feature with RRM changes
+
+Due to RRM link measurement changes new NL Attribute and NL extended
+feature are added in kernel. The NL attributes and extended feature
+are:
+	NL80211_ATTR_WIPHY_MAX_TX_POWER_LEVEL
+	NL80211_EXT_FEATURE_TX_POWER_REPORTING
+
+Add this NL changes in iw to sync NL attribute and NL extended
+feature with kernel changes.
+
+The below NL Attributes are used in iw. Thus sync will make the
+below attributes not impacted after the RRM chnages.
+
+            NL80211_ATTR_RU_PUNCT_BITMAP
+            NL80211_ATTR_AP_PS
+            NL80211_ATTR_MULTI_HW_MACS
+
+Signed-off-by: Raj Kumar Bhagat <quic_rajkbhag@quicinc.com>
+---
+ info.c    |  3 +++
+ nl80211.h | 15 +++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/info.c b/info.c
+index 32d15c6..6ac51bb 100644
+--- a/info.c
++++ b/info.c
+@@ -167,7 +167,10 @@ static void ext_feat_print(enum nl80211_ext_feature_index idx)
+ 		      "support for MFP in range measurement negotiation/procedure");
+ 	ext_feat_case(BSS_COLOR, "BSS coloring support");
+ 	ext_feat_case(FILS_CRYPTO_OFFLOAD, "FILS crypto offload");
++	ext_feat_case(WIDE_BAND_SCAN, "wide band scan support");
+ 	ext_feat_case(RADAR_BACKGROUND, "Radar background support");
++	ext_feat_case(STA_MGMT_RTS_CTS, "station management RTS CTS support");
++	ext_feat_case(TX_POWER_REPORTING, "Support to report tranmit power to userspace for RRM");
+ 	}
+ }
+ 
+diff --git a/nl80211.h b/nl80211.h
+index ac977ed..2d9a3d6 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -2679,6 +2679,10 @@ enum nl80211_commands {
+  * @NL80211_ATTR_WIPHY_ANTENNA_GAIN: Configured antenna gain. Used to reduce
+  *	transmit power to stay within regulatory limits. u32, dBi.
+  *
++ * @NL80211_ATTR_WIPHY_MAX_TX_POWER_LEVEL: Max transmit power level allowed in
++ *	the operating channel as per device capability, policy and regulatory
++ *	authority in signed mBm units.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3221,6 +3225,8 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_EMA_RNR_ELEMS,
+ 
++	NL80211_ATTR_WIPHY_MAX_TX_POWER_LEVEL,
++
+ 	NL80211_ATTR_RU_PUNCT_SUPP_BW,
+ 
+ 	NL80211_ATTR_RU_PUNCT_SUPP_HE,
+@@ -6397,6 +6403,12 @@ enum nl80211_feature_flags {
+  * @NL80211_EXT_FEATURE_RADAR_BACKGROUND: Device supports background radar/CAC
+  *	detection.
+  *
++ * @NL80211_EXT_FEATURE_WIDE_BAND_SCAN: Driver/device supports wide band scan
++ *	on a frequency along with its corresponding phymode (40Mhz, 80Mhz)
++ *
++ * @NL80211_EXT_FEATURE_TX_POWER_REPORTING: Driver supports reporting the
++ *	transmit power information to the userspace.
++ *
+  * @NUM_NL80211_EXT_FEATURES: number of extended features.
+  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
+  */
+@@ -6463,7 +6475,10 @@ enum nl80211_ext_feature_index {
+ 	NL80211_EXT_FEATURE_PROT_RANGE_NEGO_AND_MEASURE,
+ 	NL80211_EXT_FEATURE_BSS_COLOR,
+ 	NL80211_EXT_FEATURE_FILS_CRYPTO_OFFLOAD,
++	NL80211_EXT_FEATURE_WIDE_BAND_SCAN,
+ 	NL80211_EXT_FEATURE_RADAR_BACKGROUND,
++	NL80211_EXT_FEATURE_STA_MGMT_RTS_CTS,
++	NL80211_EXT_FEATURE_TX_POWER_REPORTING,
+ 
+ 	/* add new features before the definition below */
+ 	NUM_NL80211_EXT_FEATURES,
+-- 
+2.17.1
+
