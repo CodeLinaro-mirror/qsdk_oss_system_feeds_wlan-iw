@@ -14,8 +14,6 @@ Signed-off-by: Aaradhana Sahu <quic_aarasahu@quicinc.com>
  phy.c | 43 +++++++++++++++++++++++++++++++++----------
  2 files changed, 34 insertions(+), 10 deletions(-)
 
-diff --git a/iw.h b/iw.h
-index bb43fcb..d01b85b 100644
 --- a/iw.h
 +++ b/iw.h
 @@ -42,6 +42,7 @@ enum nlmsgerr_attrs {
@@ -26,11 +24,9 @@ index bb43fcb..d01b85b 100644
  
  /* libnl 1.x compatibility code */
  #if !defined(CONFIG_LIBNL20) && !defined(CONFIG_LIBNL30)
-diff --git a/phy.c b/phy.c
-index d112266..c6e4d1f 100644
 --- a/phy.c
 +++ b/phy.c
-@@ -666,20 +666,43 @@ static int handle_txpower(struct nl80211_state *state,
+@@ -666,20 +666,43 @@ static int handle_txpower(struct nl80211
  			  enum id_input id)
  {
  	enum nl80211_tx_power_setting type;
@@ -42,7 +38,8 @@ index d112266..c6e4d1f 100644
 -		return 1;
 +	if (argc == 3 || argc == 4) {
 +		max_argc = 4;
-+
+ 
+-	if (!strcmp(argv[0], "auto"))
 +		if (!strcmp(argv[0], "-l")) {
 +			unsigned int link_id;
 +			char *endptr;
@@ -65,8 +62,7 @@ index d112266..c6e4d1f 100644
 +		max_argc = 2;
 +		i = 0;
 +	}
- 
--	if (!strcmp(argv[0], "auto"))
++
 +	if (!strcmp(argv[i], "auto"))
  		type = NL80211_TX_POWER_AUTOMATIC;
 -	else if (!strcmp(argv[0], "fixed"))
@@ -81,7 +77,7 @@ index d112266..c6e4d1f 100644
  		return 2;
  	}
  
-@@ -687,16 +710,16 @@ static int handle_txpower(struct nl80211_state *state,
+@@ -687,16 +710,16 @@ static int handle_txpower(struct nl80211
  
  	if (type != NL80211_TX_POWER_AUTOMATIC) {
  		char *endptr;
@@ -101,6 +97,12 @@ index d112266..c6e4d1f 100644
  		return 1;
  
  	return 0;
--- 
-2.17.1
-
+@@ -707,7 +730,7 @@ static int handle_txpower(struct nl80211
+ COMMAND(set, txpower, "<auto|fixed|limit> [<tx power in mBm>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_txpower,
+ 	"Specify transmit power level and setting type.");
+-COMMAND(set, txpower, "<auto|fixed|limit> [<tx power in mBm>]",
++COMMAND(set, txpower, "[-l] <link id> <auto|fixed|limit> [<tx power in mBm>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_txpower,
+ 	"Specify transmit power level and setting type.");
+ 
