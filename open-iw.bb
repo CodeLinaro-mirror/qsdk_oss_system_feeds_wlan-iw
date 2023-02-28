@@ -5,13 +5,13 @@ SECTION = "console/network"
 LIC_FILES_CHKSUM = "file://COPYING;md5=878618a5c4af25e9b93ef0be1a93f774"
 
 PKG_NAME = "iw"
-PKG_VERSION = "5.16"
+PKG_VERSION = "5.19"
 
 
 FILESEXTRAPATHS_append := "${THISDIR}/package/network/utils/iw/patches:"
 SRC_URI = "https://www.kernel.org/pub/software/network/iw/${PKG_NAME}-${PKG_VERSION}.tar.xz"
 
-SRC_URI[md5sum] = "782a3460da2854bd2e5b8f96845a62f8"
+SRC_URI[md5sum] = "fd17ca2dd5f160a5d9e5fd3f8a69f416"
 S = "${WORKDIR}/${PKG_NAME}-${PKG_VERSION}"
 inherit pkgconfig
 
