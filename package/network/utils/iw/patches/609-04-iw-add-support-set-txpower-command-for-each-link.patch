@@ -10,20 +10,9 @@ iw wlan0 set txpower -l <link id> <auto|fixed|limit> [<tx power in mBm>]
 
 Signed-off-by: Aaradhana Sahu <quic_aarasahu@quicinc.com>
 ---
- iw.h  |  1 +
  phy.c | 43 +++++++++++++++++++++++++++++++++----------
- 2 files changed, 34 insertions(+), 10 deletions(-)
+ 1 files changed, 34 insertions(+), 10 deletions(-)
 
---- a/iw.h
-+++ b/iw.h
-@@ -42,6 +42,7 @@ enum nlmsgerr_attrs {
- #define ETH_ALEN 6
- #define VHT_MUMIMO_GROUP_LEN 24
- #define MLD_MAX_LINK_BUF_SIZE 100
-+#define MAX_MLD_LINK 15
- 
- /* libnl 1.x compatibility code */
- #if !defined(CONFIG_LIBNL20) && !defined(CONFIG_LIBNL30)
 --- a/phy.c
 +++ b/phy.c
 @@ -666,20 +666,43 @@ static int handle_txpower(struct nl80211
