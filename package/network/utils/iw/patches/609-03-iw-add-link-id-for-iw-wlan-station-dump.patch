@@ -59,7 +59,7 @@ Signed-off-by: Aaradhana Sahu <quic_aarasahu@quicinc.com>
 +		nla_for_each_nested(attrs, tb[NL80211_ATTR_MLO_LINKS], ret) {
 +			nla_parse_nested(link, NL80211_ATTR_MAX, attrs, NULL);
 +			if (link[NL80211_ATTR_MLO_LINK_ID]) {
-+				offset = snprintf(link_buf + offset,
++				offset += snprintf(link_buf + offset,
 +						  MLD_MAX_LINK_BUF_SIZE - offset,
 +						  "%slink%d", indent,
 +						  nla_get_u8(link[NL80211_ATTR_MLO_LINK_ID]));
