@@ -45,6 +45,10 @@ TARGET_CFLAGS = "-fpie -Wall -Werror -O2 "
 TARGET_LDFLAGS = "-pie"
 EXTRA_OEMAKE = ""
 
+do_patch() {
+        ls ${THISDIR}/package/network/utils/iw/patches | xargs -I % sh -c 'echo "applying patch "%;patch -d${S} -f -p1 < ${THISDIR}/package/network/utils/iw/patches/%'
+}
+
 do_compile() {
 	echo "patch is done"
 	make -C ${S} ARCH="arm64" V=1
