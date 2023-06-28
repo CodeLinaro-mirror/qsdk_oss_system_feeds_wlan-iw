@@ -31,11 +31,11 @@ Signed-off-by: Mahendran P <quic_mahep@quicinc.com>
 +	QCA_NL80211_VENDOR_SUBCMD_TELEMETRY_SLA_THERSHOLD_CFG = 210,
 +	QCA_NL80211_VENDOR_SUBCMD_TELEMETRY_SLA_SAMPLES_COLLECTION_CFG = 211,
 +	QCA_NL80211_VENDOR_SUBCMD_TELEMETRY_SLA_BREACH_DETECTION_CFG = 212
-+
++	QCA_NL80211_VENDOR_SUBCMD_SAWF_SLA_BREACH = 214,
  };
  /* Attributes for data used by
   * QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION and
-@@ -127,6 +131,52 @@ enum qca_wlan_vendor_sawf_attr_config {
+@@ -127,6 +131,82 @@ enum qca_wlan_vendor_sawf_attr_config {
  		QCA_WLAN_VENDOR_SAWF_ATTR_CONFIG_AFTER_LAST - 1,
  };
  
@@ -84,13 +84,43 @@ Signed-off-by: Mahendran P <quic_mahep@quicinc.com>
 +		QCA_WLAN_VENDOR_TELEMETRY_SLA_THERSHOLD_CFG_AFTER_LAST - 1,
 +};
 +
++/**
++ * enum qca_wlan_vendor_attr_sawf_sla_params - This enum defines
++ * attributes required for QCA_NL80211_VENDOR_SUBCMD_SAWF_SLA_BREACH
++ * Used to send sla clear event to driver.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_SLA_PEER_MAC: Unsigned 8-bit array
++ * of size 6, representing peer mac address.
++ * @QCA_WLAN_VENDOR_ATTR_SLA_SVC_ID: Unsigned 8-bit representing service ID
++ * @QCA_WLAN_VENDOR_ATTR_SLA_PARAM: Unsigned 8-bit indicaing service class
++ * from qca_vendor_attr_sla_param_type
++ * @QCA_WLAN_VENDOR_ATTR_SLA_PEER_MLD_MAC: Unsigned 8-bit array
++ * of size 6, representing peer mld mac address. Filled only for ML capable
++ * peers
++ * @QCA_WLAN_VENDOR_ATTR_SLA_AC: Unsigned 8-bit representing AC for breach
++ *
++ */
++enum qca_wlan_vendor_attr_sawf_sla_params {
++	QCA_WLAN_VENDOR_ATTR_SLA_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_SLA_PEER_MAC = 1,
++	QCA_WLAN_VENDOR_ATTR_SLA_SVC_ID = 2,
++	QCA_WLAN_VENDOR_ATTR_SLA_PARAM = 3,
++	QCA_WLAN_VENDOR_ATTR_SLA_SET_CLEAR = 4,
++	QCA_WLAN_VENDOR_ATTR_SLA_PEER_MLD_MAC = 5,
++	QCA_WLAN_VENDOR_ATTR_SLA_AC = 6,
++
++	/* Keep last */
++	QCA_WLAN_VENDOR_ATTR_SLA_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_SLA_MAX =
++		QCA_WLAN_VENDOR_ATTR_SLA_AFTER_LAST - 1
++};
 +
  #define HANDLER_RET_USAGE 1
  #define HANDLER_RET_DONE 3
  
 --- /dev/null
 +++ b/telemetry.c
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,305 @@
 +/*
 + * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
 +
@@ -357,3 +387,42 @@ Signed-off-by: Mahendran P <quic_mahep@quicinc.com>
 +"<msdu_rate_loss>", NL80211_CMD_VENDOR, 0, CIB_PHY,
 +handle_telemetry_sawf_sla_detection_cfg, ".");
 +
++#define TELEMETRY_SLA_CLEAR_STATS_MAX_ARG 1
++#define MAC_ADDR_LEN 18
++
++static int handle_telemetry_sla_clear_stats(struct nl80211_state *state,
++					    struct nl_msg *msg, int argc, char **argv,
++					    enum id_input id)
++{
++	struct nlattr *sla_clear;
++	unsigned char mac_addr[MAC_ADDR_LEN];
++
++	if (argc != TELEMETRY_SLA_CLEAR_STATS_MAX_ARG)
++		goto err;
++
++	if (mac_addr_a2n(mac_addr, argv[0])) {
++		printf("Invalid MAC address\n");
++		return -EINVAL;
++	}
++
++	nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_QCA);
++	nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
++		    QCA_NL80211_VENDOR_SUBCMD_SAWF_SLA_BREACH);
++
++	sla_clear = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
++	if (!sla_clear)
++		return -ENOBUFS;
++
++	if (nla_put(msg, QCA_WLAN_VENDOR_ATTR_SLA_PEER_MAC,
++		    ETH_ALEN, mac_addr))
++		return -ENOBUFS;
++
++	nla_nest_end(msg, sla_clear);
++	return NL_OK;
++err:
++	printf("Invalid telemetry sla clear stats, command format: Usage\n");
++	printf("\t iw dev <devname> telemetry sla_clear_stats <peer_mac>\n");
++	return NL_STOP;
++}
++COMMAND(telemetry, sla_clear_stats, "<peer_mac>", NL80211_CMD_VENDOR, 0, CIB_NETDEV,
++	handle_telemetry_sla_clear_stats, ".");
