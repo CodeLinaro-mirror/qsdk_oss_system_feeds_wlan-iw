@@ -39,9 +39,9 @@ Signed-off-by: Raj Kumar Bhagat <quic_rajkbhag@quicinc.com>
  
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -6397,6 +6397,9 @@ enum nl80211_feature_flags {
-  * @NL80211_EXT_FEATURE_RADAR_BACKGROUND: Device supports background radar/CAC
-  *	detection.
+@@ -6496,6 +6496,9 @@ enum nl80211_feature_flags {
+  *	might apply, e.g. no scans in progress, no offchannel operations
+  *	in progress, and no active connections.
   *
 + * @NL80211_EXT_FEATURE_WIDE_BAND_SCAN: Driver/device supports wide band scan
 + *	on a frequency along with its corresponding phymode (40Mhz, 80Mhz)
@@ -49,13 +49,13 @@ Signed-off-by: Raj Kumar Bhagat <quic_rajkbhag@quicinc.com>
   * @NUM_NL80211_EXT_FEATURES: number of extended features.
   * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
   */
-@@ -6463,7 +6466,9 @@ enum nl80211_ext_feature_index {
+@@ -6562,7 +6565,9 @@ enum nl80211_ext_feature_index {
  	NL80211_EXT_FEATURE_PROT_RANGE_NEGO_AND_MEASURE,
  	NL80211_EXT_FEATURE_BSS_COLOR,
  	NL80211_EXT_FEATURE_FILS_CRYPTO_OFFLOAD,
 +	NL80211_EXT_FEATURE_WIDE_BAND_SCAN,
  	NL80211_EXT_FEATURE_RADAR_BACKGROUND,
 +	NL80211_EXT_FEATURE_STA_MGMT_RTS_CTS,
+ 	NL80211_EXT_FEATURE_POWERED_ADDR_CHANGE,
  
  	/* add new features before the definition below */
- 	NUM_NL80211_EXT_FEATURES,

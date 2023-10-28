@@ -18,7 +18,7 @@ Signed-off-by: Pradeep Kumar Chitrapu <pradeepc@codeaurora.org>
 
 --- a/interface.c
 +++ b/interface.c
-@@ -745,8 +745,10 @@ COMMAND(switch, freq,
+@@ -750,8 +750,10 @@ COMMAND(switch, freq,
  	"<control freq> [5|10|20|40|80|80+80|160] [<center1_freq> [<center2_freq>]] [beacons <count>] [block-tx]",
  	NL80211_CMD_CHANNEL_SWITCH, 0, CIB_NETDEV, handle_freq,
  	"Switch the operating channel by sending a channel switch announcement (CSA).");
@@ -62,7 +62,7 @@ Signed-off-by: Pradeep Kumar Chitrapu <pradeepc@codeaurora.org>
  	NL80211_CMD_RADAR_DETECT, 0, CIB_NETDEV, handle_cac_trigger,
 --- a/util.c
 +++ b/util.c
-@@ -580,7 +580,8 @@ static int parse_freqs(struct chandef *c
+@@ -584,7 +584,8 @@ static int parse_freqs(struct chandef *c
   * user by giving "NOHT" instead.
   *
   * The working specifier if chan is set are:
@@ -72,7 +72,7 @@ Signed-off-by: Pradeep Kumar Chitrapu <pradeepc@codeaurora.org>
   *
   * And if frequency is set:
   *   <freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz]
-@@ -653,7 +654,12 @@ int parse_freqchan(struct chandef *chand
+@@ -661,7 +662,12 @@ int parse_freqchan(struct chandef *chand
  	if (chan) {
  		enum nl80211_band band;
  
@@ -86,7 +86,7 @@ Signed-off-by: Pradeep Kumar Chitrapu <pradeepc@codeaurora.org>
  		freq = ieee80211_channel_to_frequency(freq, band);
  	}
  	chandef->control_freq = freq;
-@@ -661,9 +667,9 @@ int parse_freqchan(struct chandef *chand
+@@ -669,9 +675,9 @@ int parse_freqchan(struct chandef *chand
  	chandef->center_freq1 = freq;
  
  	/* Try to parse HT mode definitions */

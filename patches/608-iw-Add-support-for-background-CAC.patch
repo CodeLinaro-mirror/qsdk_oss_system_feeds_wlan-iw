@@ -13,7 +13,7 @@ Changes are made to support following CLIs:
 
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -1493,6 +1493,7 @@ enum nl80211_commands {
+@@ -1537,6 +1537,7 @@ enum nl80211_commands {
  
  	NL80211_CMD_AWGN_DETECT,
  
@@ -77,7 +77,7 @@ Changes are made to support following CLIs:
  }
  
  static int no_seq_check(struct nl_msg *msg, void *arg)
-@@ -374,9 +400,9 @@ TOPLEVEL(cac, "channel <channel> [6G] [N
+@@ -375,9 +401,9 @@ TOPLEVEL(cac, "channel <channel> [6G] [N
  	      "freq <control freq> [5|10|20|40|80|80+80|160] [<center1_freq> [<center2_freq>]]",
  	 0, 0, CIB_NETDEV, handle_cac, NULL);
  COMMAND(cac, trigger,
@@ -90,34 +90,34 @@ Changes are made to support following CLIs:
  	NL80211_CMD_RADAR_DETECT, 0, CIB_NETDEV, handle_cac_trigger,
  	"Start or trigger a channel availability check (CAC) looking to look for\n"
  	"radars on the given channel.");
-@@ -882,3 +908,39 @@ static int handle_get_txq(struct nl80211
- COMMAND(get, txq, "",
- 	NL80211_CMD_GET_WIPHY, 0, CIB_PHY, handle_get_txq,
- 	"Get TXQ parameters.");
+@@ -884,3 +910,39 @@ static int handle_antenna_gain(struct nl
+ COMMAND(set, antenna_gain, "<antenna gain in dBm>",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_antenna_gain,
+ 	"Specify antenna gain.");
 +
 +static int handle_cac_stop(struct nl80211_state *state,
-+                      struct nl_msg *msg,
-+                      int argc, char **argv,
-+                      enum id_input id)
++		      struct nl_msg *msg,
++		      int argc, char **argv,
++		      enum id_input id)
 +{
 +	if (argc > 0) {
-+		if (!strcmp(argv[0], "-l")) {
-+			unsigned int link_id;
-+			char *endptr;
++	       if (!strcmp(argv[0], "-l")) {
++		       unsigned int link_id;
++		       char *endptr;
 +
-+			if (argc != 2)
-+				return 1;
++		       if (argc != 2)
++			       return 1;
 +
-+			link_id = strtol(argv[1], &endptr, 10);
++		       link_id = strtol(argv[1], &endptr, 10);
 +
-+			if (*endptr)
-+				return 1;
++		       if (*endptr)
++			       return 1;
 +
-+			if (link_id <= MAX_MLD_LINK) {
-+				NLA_PUT_U8(msg, NL80211_ATTR_MLO_LINK_ID,
-+					   link_id);
-+			}
-+		}
++		       if (link_id <= MAX_MLD_LINK) {
++			       NLA_PUT_U8(msg, NL80211_ATTR_MLO_LINK_ID,
++					  link_id);
++		       }
++	       }
 +	}
 +
 +	return 0;
@@ -127,6 +127,6 @@ Changes are made to support following CLIs:
 +}
 +
 +COMMAND(cac, stop, "[-l] <link id>",
-+        NL80211_CMD_STOP_BGRADAR_DETECT, 0, CIB_NETDEV, handle_cac_stop,
++	NL80211_CMD_STOP_BGRADAR_DETECT, 0, CIB_NETDEV, handle_cac_stop,
 +        "Stop the ongoing background CAC");
 +
