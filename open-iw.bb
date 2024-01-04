@@ -8,7 +8,7 @@ PKG_NAME = "iw"
 PKG_VERSION = "5.16"
 
 
-FILESEXTRAPATHS_append := "${THISDIR}/package/network/utils/iw/patches:"
+FILESEXTRAPATHS:append := "${THISDIR}/package/network/utils/iw/patches:"
 SRC_URI = "https://www.kernel.org/pub/software/network/iw/${PKG_NAME}-${PKG_VERSION}.tar.xz"
 SRC_URI +=" \
 	file://001-nl80211_h_sync.patch \
@@ -57,7 +57,7 @@ do_configure() {
 	chmod +x ${WORKDIR}/${PKG_NAME}-${PKG_VERSION}/version.sh
 
 }
-FILES_${PN} += "/usr/sbin/*"
+FILES:${PN} += "/usr/sbin/*"
 
 do_install() {
 	echo "after compile"
