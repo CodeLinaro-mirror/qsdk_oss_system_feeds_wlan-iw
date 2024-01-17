@@ -16,11 +16,9 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
  telemetry.c  | 215 ++++++++++++++++++++++++++++++++---
  5 files changed, 837 insertions(+), 28 deletions(-)
 
-diff --git a/defqmap.c b/defqmap.c
-index d3dbeb7b9632..f30c12cd2fae 100644
 --- a/defqmap.c
 +++ b/defqmap.c
-@@ -40,7 +40,40 @@ static int handle_default_q_map_req(struct nl80211_state *state,
+@@ -40,7 +40,40 @@ static int handle_default_q_map_req(stru
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -62,7 +60,7 @@ index d3dbeb7b9632..f30c12cd2fae 100644
  }
  
  COMMAND(defqmap, map, "<service_id> <macaddr>", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_default_q_map_req, ".");
-@@ -49,7 +82,40 @@ static int handle_default_q_unmap_req(struct nl80211_state *state,
+@@ -49,7 +82,40 @@ static int handle_default_q_unmap_req(st
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -104,7 +102,7 @@ index d3dbeb7b9632..f30c12cd2fae 100644
  }
  
  COMMAND(defqmap, unmap, "<service_id> <macaddr>", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_default_q_unmap_req, ".");
-@@ -58,7 +124,32 @@ static int handle_default_q_map_report(struct nl80211_state *state,
+@@ -58,7 +124,32 @@ static int handle_default_q_map_report(s
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -137,8 +135,6 @@ index d3dbeb7b9632..f30c12cd2fae 100644
  }
  
  COMMAND(defqmap, report, "<macaddr>", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_default_q_map_report, ".");
-diff --git a/iw.h b/iw.h
-index 1327c7f5f1ee..0104ac655236 100644
 --- a/iw.h
 +++ b/iw.h
 @@ -70,6 +70,8 @@ enum id_input {
@@ -338,8 +334,6 @@ index 1327c7f5f1ee..0104ac655236 100644
  #define HANDLER_RET_USAGE 1
  #define HANDLER_RET_DONE 3
  
-diff --git a/sawf.c b/sawf.c
-index 653e15b86a36..17353de15307 100644
 --- a/sawf.c
 +++ b/sawf.c
 @@ -34,15 +34,10 @@
@@ -360,7 +354,7 @@ index 653e15b86a36..17353de15307 100644
  
  SECTION(service_class);
  
-@@ -50,10 +45,142 @@ static int handle_service_class_create(struct nl80211_state *state,
+@@ -50,10 +45,142 @@ static int handle_service_class_create(s
  				       struct nl_msg *msg, int argc,
  				       char **argv, enum id_input id)
  {
@@ -505,7 +499,7 @@ index 653e15b86a36..17353de15307 100644
  	" [max_tput <max_thruput_rate>] [burst_size <burst_size>]"
  	" [service_interval <service_interval>] [delay_bound <delay_bound>]"
  	" [msdu_ttl <msdu_ttl>] [priority <priority>] [tid <tid>]"
-@@ -68,14 +195,139 @@ static int handle_service_class_disable(struct nl80211_state *state,
+@@ -68,14 +195,139 @@ static int handle_service_class_disable(
  					struct nl_msg *msg, int argc,
  					char **argv, enum id_input id)
  {
@@ -647,7 +641,7 @@ index 653e15b86a36..17353de15307 100644
  	return NL_SKIP;
  }
  
-@@ -83,7 +335,44 @@ static int handle_service_class_dump(struct nl80211_state *state,
+@@ -83,7 +335,44 @@ static int handle_service_class_dump(str
  				     struct nl_msg *msg, int argc,
  				     char **argv, enum id_input id)
  {
@@ -693,11 +687,9 @@ index 653e15b86a36..17353de15307 100644
  }
  
  COMMAND(service_class, view, "[<service_id>]", NL80211_CMD_VENDOR, NLM_F_DUMP, CIB_PHY,
-diff --git a/sawf_stats.c b/sawf_stats.c
-index e922daba0600..bb195c5982ec 100644
 --- a/sawf_stats.c
 +++ b/sawf_stats.c
-@@ -44,7 +44,64 @@ static int handle_streaming_stats(struct nl80211_state *state,
+@@ -44,7 +44,64 @@ static int handle_streaming_stats(struct
  				  struct nl_msg *msg, int argc, char **argv,
  				  enum id_input id)
  {
@@ -738,14 +730,14 @@ index e922daba0600..bb195c5982ec 100644
 +
 +	if (argc) {
 +		argc--;
-+		if (!strcmp(argv[1], "-l") || !argc)
++		if (strcmp(argv[1], "-l") || !argc)
 +			goto err;
 +		errno = 0;
 +		link_id = strtoul(argv[2], &end, 10);
 +		if (*end != '\0' || value > MAX_MLD_LINK || errno == ERANGE) {
 +			goto err;
 +		}
-+		nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_MLO_LINK_ID, link_id);
++		nla_put_u32(msg, QCA_WLAN_VENDOR_ATTR_SDWF_MLO_LINK_ID, link_id);
 +	}
 +
 +	nla_nest_end(msg, streaming);
@@ -763,8 +755,6 @@ index e922daba0600..bb195c5982ec 100644
  }
  
  COMMAND(streaming_stats, handle, "<value> [-l <link_id>]", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_streaming_stats, ".");
-diff --git a/telemetry.c b/telemetry.c
-index 48b9f656f2ef..b880ab331ae8 100644
 --- a/telemetry.c
 +++ b/telemetry.c
 @@ -45,14 +45,14 @@
@@ -1009,7 +999,7 @@ index 48b9f656f2ef..b880ab331ae8 100644
  
  #define TELEMETRY_SLA_CLEAR_STATS_MAX_ARG 1
  #define MAC_ADDR_LEN 18
-@@ -127,7 +283,40 @@ static int handle_telemetry_sla_clear_stats(struct nl80211_state *state,
+@@ -127,7 +283,40 @@ static int handle_telemetry_sla_clear_st
  					    struct nl_msg *msg, int argc, char **argv,
  					    enum id_input id)
  {
@@ -1050,6 +1040,3 @@ index 48b9f656f2ef..b880ab331ae8 100644
  }
  COMMAND(telemetry, sla_clear_stats, "<peer_mac>", NL80211_CMD_VENDOR, 0, CIB_NETDEV,
  	handle_telemetry_sla_clear_stats, ".");
--- 
-2.17.1
-
