@@ -41,13 +41,13 @@ S = "${WORKDIR}/${PKG_NAME}-${PKG_VERSION}"
 inherit pkgconfig
 
 DEPENDS += "libnl"
-TARGET_CFLAGS = "-fpie -Wall -Werror -O2 "
+TARGET_CFLAGS = "-fpie -Wall -Werror -O2 -Wno-error=sign-compare"
 TARGET_LDFLAGS = "-pie"
 EXTRA_OEMAKE = ""
 
 do_compile() {
 	echo "patch is done"
-	make -C ${S} ARCH="arm64" V=1
+	make -C ${S} ARCH='${KARCH}' V=1
 }
 
 do_configure() {
