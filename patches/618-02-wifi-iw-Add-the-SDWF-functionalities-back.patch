@@ -18,7 +18,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 
 --- a/defqmap.c
 +++ b/defqmap.c
-@@ -40,7 +40,40 @@ static int handle_default_q_map_req(stru
+@@ -40,7 +40,42 @@ static int handle_default_q_map_req(stru
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -48,6 +48,8 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_MAP);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
++	if (!def_q_params)
++		return -ENOBUFS;
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEF_Q_MAP_SVC_ID, value);
 +	nla_put(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEF_Q_MAP_MAC_ADDR, MAC_ADDR_LEN, macaddr);
@@ -60,7 +62,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
  }
  
  COMMAND(defqmap, map, "<service_id> <macaddr>", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_default_q_map_req, ".");
-@@ -49,7 +82,40 @@ static int handle_default_q_unmap_req(st
+@@ -49,7 +84,42 @@ static int handle_default_q_unmap_req(st
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -90,6 +92,8 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_UNMAP);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
++	if (!def_q_params)
++		return -ENOBUFS;
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEF_Q_MAP_SVC_ID, value);
 +	nla_put(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEF_Q_MAP_MAC_ADDR, MAC_ADDR_LEN, macaddr);
@@ -102,7 +106,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
  }
  
  COMMAND(defqmap, unmap, "<service_id> <macaddr>", NL80211_CMD_VENDOR, 0, CIB_NETDEV, handle_default_q_unmap_req, ".");
-@@ -58,7 +124,32 @@ static int handle_default_q_map_report(s
+@@ -58,7 +128,35 @@ static int handle_default_q_map_report(s
  				struct nl_msg *msg, int argc, char **argv,
  				enum id_input id)
  {
@@ -125,6 +129,9 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_MAP_GET);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
++	if (!def_q_params)
++		return -ENOBUFS;
++
 +	nla_put(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEF_Q_MAP_MAC_ADDR, MAC_ADDR_LEN, macaddr);
 +
 +	nla_nest_end(msg, def_q_params);
