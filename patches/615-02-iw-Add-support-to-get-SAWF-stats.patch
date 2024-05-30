@@ -1,7 +1,13 @@
 From 581b7eb9fb63e21a277e71799756f6f629581ebf Mon Sep 17 00:00:00 2001
 From: Nagarajan Maran <quic_nmaran@quicinc.com>
 Date: Thu, 8 Jun 2023 18:30:49 +0530
-Subject: [PATCH] iw: Add support to get SAWF stats
+Subject: [PATCH] QSDK: iw: Add support to get SAWF stats
+
+Patch-dependency: 611-add-sawf-support.patch
+		  612-iw-default-q-map-support.patch
+		  613-iw-add-sawf-uplink-configuration-paramters-support.patch
+		  614-iw-add-support-to-configure-telemetry.patch
+		  615-01-iw-Add-support-to-handle-streaming-stats-in-target.patch
 
 Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 ---
@@ -215,7 +221,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +static int print_telemetry_stats(struct nl_msg *msg, void *arg)
 +{
 +	struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
-+	struct nlattr *stats[QCA_WLAN_VENDOR_ATTR_TELEMETRIC_MAX + 1];
++	struct nlattr *stats[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1];
 +	struct nlattr *feat[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1];
 +	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 +        static struct nla_policy stats_policy[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1] = {
