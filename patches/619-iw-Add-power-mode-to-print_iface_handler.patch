@@ -13,28 +13,24 @@ Signed-off-by: Hariharan Basuthkar <quic_hbasuthk@quicinc.com>
  interface.c | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/interface.c b/interface.c
-index 10b98d9..3aacc97 100644
 --- a/interface.c
 +++ b/interface.c
-@@ -396,6 +396,7 @@ static void print_channel_txpower(struct nlattr *tb_msg[], const char *space)
- 		 printf("\t\t%stxpower %d.%.2d dBm\n", space,
- 			txp / 100, txp % 100);
+@@ -391,6 +391,7 @@ static void print_channel(struct nlattr
+ 		channel_type = nla_get_u32(tb[NL80211_ATTR_WIPHY_CHANNEL_TYPE]);
+ 		printf(" %s", channel_type_name(channel_type));
  	}
 +
  }
  
  static int print_iface_handler(struct nl_msg *msg, void *arg)
-@@ -441,6 +442,9 @@ static int print_iface_handler(struct nl_msg *msg, void *arg)
- 		printf("%s\ttype %s\n", indent, iftype_name(nla_get_u32(tb_msg[NL80211_ATTR_IFTYPE])));
- 	if (!wiphy && tb_msg[NL80211_ATTR_WIPHY])
- 		printf("%s\twiphy %d\n", indent, nla_get_u32(tb_msg[NL80211_ATTR_WIPHY]));
+@@ -461,6 +462,10 @@ static int print_iface_handler(struct nl
+ 			printf("%s\t4addr: on\n", indent);
+ 	}
+ 
 +	if (tb_msg[NL80211_ATTR_6G_REG_POWER_MODE])
 +		printf("%s\tPower mode: %d\n", indent,
 +		       nla_get_u8(tb_msg[NL80211_ATTR_6G_REG_POWER_MODE]));
++
  	if (tb_msg[NL80211_ATTR_MLO_LINKS]) {
- 		int ret = 0;
- 		nla_for_each_nested(attrs, tb_msg[NL80211_ATTR_MLO_LINKS], ret) {
--- 
-2.34.1
-
+ 		struct nlattr *link;
+ 		int n;

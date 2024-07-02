@@ -13,21 +13,13 @@ Signed-off-by: Arulanbu Balusamy <quic_abalusam@quicinc.com>
  util.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/util.c b/util.c
-index 3953ab8..b84d1e7 100644
 --- a/util.c
 +++ b/util.c
-@@ -1567,9 +1567,9 @@ static void __print_eht_capa(int band,
+@@ -1624,6 +1624,7 @@ static void __print_eht_capa(int band,
  			printf("%s\t\tEHT bw=20 MHz, max NSS for MCS %s: Rx=%u, Tx=%u\n",
  			       pre, mcs[i],
  			       mcs_set[i] & 0xf, mcs_set[i] >> 4);
 +		mcs_set += 4;
- 	}
- 
--	mcs_set += 4;
- 	if (he_phy_cap[0] & (BIT(2) << 8)) {
- 		for (i = 0; i < 3; i++)
- 			printf("%s\t\tEHT bw <= 80 MHz, max NSS for MCS %s: Rx=%u, Tx=%u\n",
--- 
-2.34.1
-
+ 	} else {
+ 		if (he_phy_cap[0] & (BIT(2) << 8)) {
+ 			for (i = 0; i < 3; i++)
