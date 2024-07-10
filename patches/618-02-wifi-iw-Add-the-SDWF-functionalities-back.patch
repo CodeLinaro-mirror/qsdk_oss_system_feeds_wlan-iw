@@ -816,7 +816,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
  	uint32_t min_throughput_rate;
  	uint32_t max_throughput_rate;
  	uint32_t burst_size;
-@@ -85,40 +85,202 @@ struct telemetry_sawf_sla_detect_param {
+@@ -85,40 +85,203 @@ struct telemetry_sawf_sla_detect_param {
  
  SECTION(telemetry);
  
@@ -958,17 +958,18 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +	if (argc != TELEMETRY_SLA_DETECTION_CONFIG_NUM_OF_PARAMS)
 +		goto err;
 +
-+	if (streq(argv[0], "num_packet"))
-+		telemetry_param.sla_detect = SLA_DETECT_NUM_PACKET;
-+
-+	if (streq(argv[0], "per_second"))
-+		telemetry_param.sla_detect = SLA_DETECT_PER_SECOND;
-+
-+	if (streq(argv[0], "moving_avg"))
-+		telemetry_param.sla_detect = SLA_DETECT_MOV_AVG;
-+
-+	if (streq(argv[0], "num_second"))
-+		telemetry_param.sla_detect = SLA_DETECT_NUM_SECOND;
++	if (streq(argv[0], "num_packet")) {
++                telemetry_param.sla_detect = SLA_DETECT_NUM_PACKET;
++        } else if (streq(argv[0], "per_second")) {
++                telemetry_param.sla_detect = SLA_DETECT_PER_SECOND;
++        } else if (streq(argv[0], "moving_avg")) {
++                telemetry_param.sla_detect = SLA_DETECT_MOV_AVG;
++        } else if (streq(argv[0], "num_second")) {
++                telemetry_param.sla_detect = SLA_DETECT_NUM_SECOND;
++        } else {
++                printf("Invalid sla detection option\n");
++                goto err;
++        }
 +
 +	telemetry_param.min_throughput_rate = strtoul(argv[1], &end, 10);
 +	telemetry_param.max_throughput_rate = strtoul(argv[2], &end, 10);
@@ -1027,7 +1028,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
  
  #define TELEMETRY_SLA_CLEAR_STATS_MAX_ARG 1
  #define MAC_ADDR_LEN 18
-@@ -127,7 +289,42 @@ static int handle_telemetry_sla_clear_st
+@@ -127,7 +290,42 @@ static int handle_telemetry_sla_clear_st
  					    struct nl_msg *msg, int argc, char **argv,
  					    enum id_input id)
  {
