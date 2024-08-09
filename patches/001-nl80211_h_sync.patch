@@ -1,20 +1,3 @@
-From 10cbfd273e4566c61b597bc1d032789a7b54b687 Mon Sep 17 00:00:00 2001
-From: Harish Rachakonda <quic_rachakon@quicinc.com>
-Date: Mon, 22 Jul 2024 15:15:53 +0530
-Subject: [PATCH] iw: iw upgrade 6.9 iw compilation fix
-
-iw upgrade to 6.9 and compilation fix patch.
-Rebase openwrt patch on top of 6.9.
-
-Signed-off-by: Harish Rachakonda <quic_rachakon@quicinc.com>
-Signed-off-by: Rajat Soni <quic_rajson@quicinc.com>
----
- nl80211.h | 5 +++++
- scan.c    | 4 ++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/nl80211.h b/nl80211.h
-index f23ecbd..5f4c1b4 100644
 --- a/nl80211.h
 +++ b/nl80211.h
 @@ -2856,6 +2856,9 @@ enum nl80211_commands {
