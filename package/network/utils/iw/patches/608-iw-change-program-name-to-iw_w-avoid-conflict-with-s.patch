@@ -1,0 +1,62 @@
+From 239fe4208272ad0466c49cf3f629caa89f6ab98c Mon Sep 17 00:00:00 2001
+From: hangtian <quic_hangtian@quicinc.com>
+Date: Fri, 30 Aug 2024 09:37:35 +0800
+Subject: [PATCH] iw: change program name to iw_w avoid conflict with system
+ default iw
+
+change program name to iw_w avoid conflict with system default iw.
+
+Signed-off-by: hangtian <quic_hangtian@quicinc.com>
+---
+ Makefile | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 8bd5457..474eed0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -23,7 +23,7 @@ _OBJS := $(sort $(patsubst %.c,%.o,$(wildcard *.c)))
+ VERSION_OBJS := $(filter-out version.o, $(_OBJS))
+ OBJS := $(VERSION_OBJS) version.o
+ 
+-ALL = iw
++ALL = iw_w
+ 
+ ifeq ($(NO_PKG_CONFIG),)
+ NL3xFOUND := $(shell $(PKG_CONFIG) --atleast-version=3.2 libnl-3.0 && echo Y)
+@@ -104,9 +104,9 @@ nl80211-commands.inc: nl80211.h
+ 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+ 
+ ifeq ($(IW_ANDROID_BUILD),)
+-iw:	$(OBJS)
+-	@$(NQ) ' CC  ' iw
+-	$(Q)$(CC) $(LDFLAGS) $(OBJS) $(LIBS) -o iw
++iw_w:	$(OBJS)
++	@$(NQ) ' CC  ' iw_w
++	$(Q)$(CC) $(LDFLAGS) $(OBJS) $(LIBS) -o iw_w
+ endif
+ 
+ check:
+@@ -116,13 +116,13 @@ check:
+ 	@$(NQ) ' GZIP' $<
+ 	$(Q)gzip < $< > $@
+ 
+-install: iw iw.8.gz
+-	@$(NQ) ' INST iw'
++install: iw_w iw_w.8.gz
++	@$(NQ) ' INST iw_w'
+ 	$(Q)$(MKDIR) $(DESTDIR)$(SBINDIR)
+-	$(Q)$(INSTALL) -m 755 iw $(DESTDIR)$(SBINDIR)
+-	@$(NQ) ' INST iw.8'
++	$(Q)$(INSTALL) -m 755 iw_w $(DESTDIR)$(SBINDIR)
++	@$(NQ) ' INST iw_w.8'
+ 	$(Q)$(MKDIR) $(DESTDIR)$(MANDIR)/man8/
+-	$(Q)$(INSTALL) -m 644 iw.8.gz $(DESTDIR)$(MANDIR)/man8/
++	$(Q)$(INSTALL) -m 644 iw_w.8.gz $(DESTDIR)$(MANDIR)/man8/
+ 
+ clean:
+-	$(Q)rm -f iw *.o *~ *.gz version.c *-stamp nl80211-commands.inc
++	$(Q)rm -f iw_w *.o *~ *.gz version.c *-stamp nl80211-commands.inc
+-- 
+2.25.1
+
