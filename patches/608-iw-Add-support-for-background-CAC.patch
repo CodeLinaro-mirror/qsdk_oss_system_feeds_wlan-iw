@@ -11,16 +11,6 @@ Changes are made to support following CLIs:
  phy.c     | 28 +++++++++++++++++++++++-----
  2 files changed, 24 insertions(+), 5 deletions(-)
 
---- a/nl80211.h
-+++ b/nl80211.h
-@@ -1595,6 +1595,7 @@ enum nl80211_commands {
- 
- 	NL80211_CMD_AWGN_DETECT,
- 
-+	NL80211_CMD_STOP_BGRADAR_DETECT,
- 	/* add new commands above here */
- 
- 	/* used to define NL80211_CMD_MAX below */
 --- a/phy.c
 +++ b/phy.c
 @@ -307,15 +307,37 @@ static int handle_cac_trigger(struct nl8
