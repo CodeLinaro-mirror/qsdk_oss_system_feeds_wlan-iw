@@ -1,0 +1,290 @@
+From 63cc0c774e559edea8e4c3fad1a4bed82e182564 Mon Sep 17 00:00:00 2001
+From: Rajat Soni <quic_rajson@quicinc.com>
+Date: Tue, 22 Oct 2024 11:50:40 +0530
+Subject: [PATCH] QSDK: CP: IW: Resolve compilation warnings
+
+Some warnings are seen during iw compilation:
+
+134917 scan.c:675:13: warning: 'print_ds' defined but not used [-Wunused-function]
+134918   675 | static void print_ds(const uint8_t type, uint8_t len, const uint8_t *data,
+134919       |             ^~~~~~~~
+134920 scan.c:620:13: warning: 'print_rm_enabled_capabilities' defined but not used [-Wunused-function]
+134921   620 | static void print_rm_enabled_capabilities(const uint8_t type, uint8_t len,
+134922       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To resolve these warning we need to include compile these functions only when
+IWFULL is enabled.
+
+Fixes: I844b5a6304e ("iw: Adding new patch for build issue")
+
+Patch-dependency: 501-compilation-fix.patch
+
+Patch-work: None
+
+Signed-off-by: Rajat Soni <quic_rajson@quicinc.com>
+---
+ event.c     |  5 ++++-
+ interface.c |  5 +++--
+ scan.c      | 16 +++++++++++-----
+ station.c   |  6 ++++--
+ util.c      |  1 -
+ 5 files changed, 22 insertions(+), 11 deletions(-)
+
+diff --git a/event.c b/event.c
+index bde65e8..d42d52b 100644
+--- a/event.c
++++ b/event.c
+@@ -103,7 +103,7 @@ static void print_frame(struct print_event_args *args, struct nlattr *attr)
+ 		printf(" %.02x", frame[i]);
+ 	printf("]");
+ }
+-#endif
++
+ static void parse_cqm_event(struct nlattr **attrs)
+ {
+ 	static struct nla_policy cqm_policy[NL80211_ATTR_CQM_MAX + 1] = {
+@@ -299,6 +299,7 @@ static void parse_wowlan_wake_event(struct nlattr **attrs)
+ 	if (tb[NL80211_WOWLAN_TRIG_UNPROTECTED_DEAUTH_DISASSOC])
+ 		printf("\t* unprotected deauth/disassoc\n");
+ }
++#endif
+ 
+ extern struct vendor_event *__start_vendor_event[];
+ extern struct vendor_event *__stop_vendor_event;
+@@ -306,6 +307,7 @@ extern struct vendor_event *__stop_vendor_event;
+ // Dummy to force the section to exist
+ VENDOR_EVENT(0xffffffff, 0xffffffff, NULL);
+ 
++#ifdef IW_FULL
+ static void parse_vendor_event(struct nlattr **attrs, bool dump)
+ {
+ 	__u32 vendor_id, subcmd;
+@@ -913,6 +915,7 @@ static void parse_assoc_comeback(struct nlattr **attrs, int command)
+ 	printf("assoc comeback bssid %s timeout %d\n",
+ 	       macbuf, timeout);
+ }
++#endif
+ 
+ static int print_event(struct nl_msg *msg, void *arg)
+ {
+diff --git a/interface.c b/interface.c
+index db29c4a..daa18b6 100644
+--- a/interface.c
++++ b/interface.c
+@@ -645,6 +645,7 @@ COMMAND(set, noack_map, "<[peer <addr>] [map]>",
+ 	"Set the NoAck map for the TIDs. (0x0009 = BE, 0x0006 = BK, 0x0030 = VI, 0x00C0 = VO)");
+ 
+ 
++#ifdef IW_FULL
+ static int handle_interface_wds_peer(struct nl80211_state *state,
+ 				     struct nl_msg *msg,
+ 				     int argc, char **argv,
+@@ -672,7 +673,7 @@ static int handle_interface_wds_peer(struct nl80211_state *state,
+  nla_put_failure:
+ 	return -ENOBUFS;
+ }
+-#ifdef IW_FULL
++
+ COMMAND(set, peer, "<MAC address>",
+ 	NL80211_CMD_SET_WDS_PEER, 0, CIB_NETDEV, handle_interface_wds_peer,
+ 	"Set interface WDS peer.");
+@@ -705,6 +706,7 @@ COMMAND(set, mcast_rate, "<rate in Mbps>",
+ 	"Set the multicast bitrate.");
+ 
+ 
++#ifdef IW_FULL
+ static int handle_chanfreq(struct nl80211_state *state, struct nl_msg *msg,
+ 			   bool chan, int argc, char **argv,
+ 			   enum id_input id)
+@@ -766,7 +768,6 @@ static int handle_chan(struct nl80211_state *state, struct nl_msg *msg,
+ 	return handle_chanfreq(state, msg, true, argc, argv, id);
+ }
+ 
+-#ifdef IW_FULL
+ SECTION(switch);
+ COMMAND(switch, freq,
+ 	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|320MHz] [ru-puncturing-bitmap <bitmap>] [beacons <count>] [block-tx]\n"
+diff --git a/scan.c b/scan.c
+index 953966b..cebd9d2 100644
+--- a/scan.c
++++ b/scan.c
+@@ -617,7 +617,6 @@ static void print_supprates(const uint8_t type, uint8_t len,
+ 	}
+ 	printf("\n");
+ }
+-#endif
+ 
+ static void print_rm_enabled_capabilities(const uint8_t type, uint8_t len,
+ 			    const uint8_t *data,
+@@ -783,6 +782,7 @@ static void print_ap_channel_report(const uint8_t type, uint8_t len, const uint8
+ 	}
+ 	printf("\n");
+ }
++#endif
+ 
+ static void print_cipher(const uint8_t *data)
+ {
+@@ -1102,12 +1102,14 @@ static void print_rsn_ie(const char *defcipher, const char *defauth,
+ 	_print_rsn_ie(defcipher, defauth, len, data, 0);
+ }
+ 
++#ifdef IW_FULL
+ static void print_osen_ie(const char *defcipher, const char *defauth,
+ 			  uint8_t len, const uint8_t *data)
+ {
+ 	printf("\n\t");
+ 	_print_rsn_ie(defcipher, defauth, len, data, 1);
+ }
++#endif
+ 
+ static void print_rsn(const uint8_t type, uint8_t len, const uint8_t *data,
+ 		      const struct print_ies_data *ie_buffer)
+@@ -1125,6 +1127,7 @@ static void print_ht_capa(const uint8_t type, uint8_t len, const uint8_t *data,
+ 	print_ht_mcs(data + 3);
+ }
+ 
++#ifdef IW_FULL
+ static const char* ntype_11u(uint8_t t)
+ {
+ 	switch (t) {
+@@ -1307,6 +1310,7 @@ static void print_tx_power_envelope(const uint8_t type, uint8_t len,
+ 			printf("\t\t * %s: %i dBm\n", power_names[i], power_val);
+ 	}
+ }
++#endif
+ 
+ static const char *ht_secondary_offset[4] = {
+ 	"no secondary",
+@@ -1514,7 +1518,6 @@ static void print_capabilities(const uint8_t type, uint8_t len,
+ 
+ 	printf("\n");
+ }
+-#endif
+ 
+ 
+ static void print_tim(const uint8_t type, uint8_t len, const uint8_t *data,
+@@ -1533,6 +1536,7 @@ static void print_ibssatim(const uint8_t type, uint8_t len, const uint8_t *data,
+ {
+ 	printf(" %d TUs\n", (data[1] << 8) + data[0]);
+ }
++#endif
+ 
+ static void print_vht_capa(const uint8_t type, uint8_t len, const uint8_t *data,
+ 			   const struct print_ies_data *ie_buffer)
+@@ -1595,7 +1599,6 @@ static void print_supp_op_classes(const uint8_t type, uint8_t len,
+ 				break;
+ 		}
+ }
+-#endif
+ 
+ static void print_measurement_pilot_tx(const uint8_t type, uint8_t len,
+ 				       const uint8_t *data,
+@@ -1660,6 +1663,7 @@ static void print_obss_scan_params(const uint8_t type, uint8_t len,
+ 	printf("\t\t * OBSS Scan Activity Threshold: %d.%02d %%\n",
+ 		((data[13] << 8) | data[12]) / 100, ((data[13] << 8) | data[12]) % 100);
+ }
++#endif
+ 
+ static void print_secchan_offs(const uint8_t type, uint8_t len,
+ 			       const uint8_t *data,
+@@ -1680,6 +1684,7 @@ static void print_bss_load(const uint8_t type, uint8_t len, const uint8_t *data,
+ 	printf("\t\t * available admission capacity: %d [*32us]\n", (data[4] << 8) | data[3]);
+ }
+ 
++#ifdef IW_FULL
+ static void print_mesh_conf(const uint8_t type, uint8_t len,
+ 			    const uint8_t *data,
+ 			    const struct print_ies_data *ie_buffer)
+@@ -1807,6 +1812,7 @@ static void print_s1g_oper(const uint8_t type, uint8_t len,
+ 	printf("\t\t\tFor 3 SS: %s\n", s1g_ss_min_support(data[5] & 0x3));
+ 	printf("\t\t\tFor 4 SS: %s\n", s1g_ss_min_support((data[5] >> 4) & 0x3));
+ }
++#endif
+ 
+ struct ie_print {
+ 	const char *name;
+@@ -1888,6 +1894,7 @@ static const struct ie_print ieprinters[] = {
+ #endif
+ };
+ 
++#ifdef IW_FULL
+ static void print_wifi_wpa(const uint8_t type, uint8_t len, const uint8_t *data,
+ 			   const struct print_ies_data *ie_buffer)
+ {
+@@ -2219,7 +2226,6 @@ static void print_wifi_wps(const uint8_t type, uint8_t len, const uint8_t *data,
+ 	}
+ }
+ 
+-#ifdef IW_FULL
+ static const struct ie_print wifiprinters[] = {
+ 	[1] = { "WPA", print_wifi_wpa, 2, 255, BIT(PRINT_SCAN), },
+ 	[2] = { "WMM", print_wifi_wmm, 1, 255, BIT(PRINT_SCAN), },
+@@ -2832,6 +2838,7 @@ COMMAND(scan, abort, "",
+ 	NL80211_CMD_ABORT_SCAN, 0, CIB_NETDEV, handle_scan_abort,
+ 	"Abort ongoing scan");
+ 
++#ifdef IW_FULL
+ static int handle_start_sched_scan(struct nl80211_state *state,
+ 				   struct nl_msg *msg,
+ 				   int argc, char **argv, enum id_input id)
+@@ -2849,7 +2856,6 @@ static int handle_stop_sched_scan(struct nl80211_state *state,
+ 	return 0;
+ }
+ 
+-#ifdef IW_FULL
+ COMMAND(scan, sched_start,
+ 	SCHED_SCAN_OPTIONS,
+ 	NL80211_CMD_START_SCHED_SCAN, 0, CIB_NETDEV, handle_start_sched_scan,
+diff --git a/station.c b/station.c
+index b1c6457..85d7496 100644
+--- a/station.c
++++ b/station.c
+@@ -826,6 +826,7 @@ static const struct cmd *select_station_cmd(int argc, char **argv)
+ 	return NULL;
+ }
+ 
++#ifdef IW_FULL
+ static int handle_station_set_plink(struct nl80211_state *state,
+ 			      struct nl_msg *msg,
+ 			      int argc, char **argv,
+@@ -870,7 +871,7 @@ static int handle_station_set_plink(struct nl80211_state *state,
+  nla_put_failure:
+ 	return -ENOBUFS;
+ }
+-#ifdef IW_FULL
++
+ COMMAND_ALIAS(station, set, "<MAC address> plink_action <open|block>",
+ 	NL80211_CMD_SET_STATION, 0, CIB_NETDEV, handle_station_set_plink,
+ 	"Set mesh peer link action for this station (peer).",
+@@ -924,6 +925,7 @@ COMMAND_ALIAS(station, set, "<MAC address> vlan <ifindex>",
+ 	"Set an AP VLAN for this station.",
+ 	select_station_cmd, station_set_vlan);
+ 
++#ifdef IW_FULL
+ static int handle_station_set_mesh_power_mode(struct nl80211_state *state,
+ 					      struct nl_msg *msg,
+ 					      int argc, char **argv,
+@@ -970,7 +972,7 @@ static int handle_station_set_mesh_power_mode(struct nl80211_state *state,
+ nla_put_failure:
+ 	return -ENOBUFS;
+ }
+-#ifdef IW_FULL
++
+ COMMAND_ALIAS(station, set, "<MAC address> mesh_power_mode "
+ 	"<active|light|deep>", NL80211_CMD_SET_STATION, 0, CIB_NETDEV,
+ 	handle_station_set_mesh_power_mode,
+diff --git a/util.c b/util.c
+index 302a6d9..931197e 100644
+--- a/util.c
++++ b/util.c
+@@ -1783,7 +1783,6 @@ int get_cf1(const struct chanmode *chanmode, unsigned long freq)
+ 	unsigned int bw160[] = { 5180, 5500, 5955, 6115, 6275, 6435,
+ 				  6595, 6755, 6915 };
+ 	/* based on 11be D2 E.1 Country information and operating classes */
+-	unsigned int bw320[] = {5955, 6115, 6275, 6435, 6595, 6755};
+ 	unsigned int eht320_1[] = { 5955, 6275, 6595 };
+ 	unsigned int eht320_2[] = { 6115, 6435, 6755 };
+ 	unsigned int eht320_1diff, eht320_2diff;
+-- 
+2.34.1
+
