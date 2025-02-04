@@ -184,7 +184,7 @@ Signed-off-by: Adwait Nayak <quic_adwaitn@quicinc.com>
  struct telemetry_sdwf_generic_param {
  	uint32_t moving_avg_pkt;
  	uint32_t moving_avg_win;
-@@ -329,3 +341,257 @@ err:
+@@ -329,3 +341,258 @@ err:
  }
  COMMAND(telemetry, sla_clear_stats, "<peer_mac>", NL80211_CMD_VENDOR, 0, CIB_NETDEV,
  	handle_telemetry_sla_clear_stats, ".");
@@ -220,7 +220,8 @@ Signed-off-by: Adwait Nayak <quic_adwaitn@quicinc.com>
 +		stats_buf =
 +			(char *) nla_data(attrs[QCA_WLAN_VENDOR_ATTR_TELEMETRIC_MULTI_STATS_DATA]);
 +
-+	printf("%s\n", stats_buf);
++	if (stats_buf)
++		printf("%s\n", stats_buf);
 +
 +	return NL_SKIP;
 +}
@@ -230,7 +231,7 @@ Signed-off-by: Adwait Nayak <quic_adwaitn@quicinc.com>
 +				int argc, char **argv,
 +				enum id_input id)
 +{
-+	int stats_type;
++	int stats_type = 0;
 +	uint8_t link_id = 0xF, index = 0;
 +	struct nlattr *attr;
 +	unsigned long stats = 0;
