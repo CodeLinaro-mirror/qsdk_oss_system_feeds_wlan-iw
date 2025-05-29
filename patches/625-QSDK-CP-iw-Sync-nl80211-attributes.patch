@@ -10,11 +10,9 @@ Signed-off-by: Rajat Soni <rajson@qti.qualcomm.com>
  nl80211.h | 27 +++++++++++++++++++++++++++
  1 file changed, 27 insertions(+)
 
-diff --git a/nl80211.h b/nl80211.h
-index e72d133..2ebbdcf 100644
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -2920,6 +2920,23 @@ enum nl80211_commands {
+@@ -2920,19 +2920,29 @@ enum nl80211_commands {
   *
   * @NL80211_ATTR_VIF_RADIO_MASK: Bitmask of allowed radios (u32).
   *	A value of 0 means all radios.
@@ -38,7 +36,20 @@ index e72d133..2ebbdcf 100644
   * @NL80211_ATTR_HE_MUEDCA_PARAMS: MU-EDCA AC parameters for the
   *	%NL80211_CMD_UPDATE_HE_MUEDCA_PARAMS command.
   * @NL80211_ATTR_BEACON_TX_MODE: used to configure the beacon tx mode as
-@@ -3541,6 +3558,13 @@ enum nl80211_attrs {
+  *	staggered mode = 1 or burst mode = 2 in %NL80211_CMD_START_AP or
+  *	%NL80211_CMD_JOIN_MESH from user-space.
+  *
+- * @NL80211_ATTR_RU_PUNCT_SUPP_BW: (u8) Minimum bandwidth for which
+- *	the driver supports preamble puncturing, value should be of type
+- *	&enum nl80211_ru_punct_supp_bw
+- *
+- * @NL80211_ATTR_RU_PUNCT_SUPP_HE: flag attribute, used to indicate that RU
+- *	puncturing bitmap validation should include OFDMA bitmaps.
+- *
+  * @NL80211_ATTR_RU_PUNCT_BITMAP: (u16) RU puncturing bitmap where the lowest
+  *	bit corresponds to the lowest 20 MHz channel. Each bit set to 1
+  *	indicates that the sub-channel is punctured, set 0 indicates that the
+@@ -3541,6 +3551,13 @@ enum nl80211_attrs {
  
  	NL80211_ATTR_VIF_RADIO_MASK,
  
@@ -52,7 +63,18 @@ index e72d133..2ebbdcf 100644
  	NL80211_ATTR_WIPHY_ANTENNA_GAIN,
  
  	NL80211_ATTR_HE_MUEDCA_PARAMS,
-@@ -3621,6 +3645,7 @@ enum nl80211_attrs {
+@@ -3553,10 +3570,6 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_6G_REG_POWER_MODE,
+ 
+-	NL80211_ATTR_RU_PUNCT_SUPP_BW,
+-
+-	NL80211_ATTR_RU_PUNCT_SUPP_HE,
+-
+ 	NL80211_ATTR_RU_PUNCT_BITMAP,
+ 
+ 	NL80211_ATTR_AP_PS,
+@@ -3621,6 +3634,7 @@ enum nl80211_attrs {
  #define NL80211_ATTR_FEATURE_FLAGS NL80211_ATTR_FEATURE_FLAGS
  
  #define NL80211_WIPHY_NAME_MAXLEN		64
@@ -60,7 +82,7 @@ index e72d133..2ebbdcf 100644
  
  #define NL80211_MAX_SUPP_RATES			32
  #define NL80211_MAX_SUPP_HT_RATES		77
-@@ -8354,6 +8379,8 @@ enum nl80211_wiphy_radio_attrs {
+@@ -8354,6 +8368,8 @@ enum nl80211_wiphy_radio_attrs {
  	NL80211_WIPHY_RADIO_ATTR_INDEX,
  	NL80211_WIPHY_RADIO_ATTR_FREQ_RANGE,
  	NL80211_WIPHY_RADIO_ATTR_INTERFACE_COMBINATION,
@@ -69,6 +91,3 @@ index e72d133..2ebbdcf 100644
  
  	/* keep last */
  	__NL80211_WIPHY_RADIO_ATTR_LAST,
--- 
-2.34.1
-
