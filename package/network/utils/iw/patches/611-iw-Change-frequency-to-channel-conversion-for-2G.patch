@@ -1,0 +1,68 @@
+From be4fbb8e74651b140e7053a7e7dc6bfbd5fb5a03 Mon Sep 17 00:00:00 2001
+From: kamalakara reddy bonga <kbonga@qti.qualcomm.com>
+Date: Mon, 9 Jun 2025 13:10:48 +0530
+Subject: [PATCH] iw: Change frequency to channel conversion for 2G
+
+ With the addition of new 2.5M step edge channels in 2.4G,
+ new formulae are added to convert the frequency to channel in iw.
+ Signed-off-by: kamalakara reddy bonga <kbonga@qti.qualcomm.com>
+---
+ util.c | 36 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/util.c b/util.c
+index 036f162..6ba0909 100644
+--- a/util.c
++++ b/util.c
+@@ -199,16 +199,44 @@ int ieee80211_channel_to_frequency(int chan, enum nl80211_band band)
+ 	return 0; /* not supported */
+ }
+ 
+-int ieee80211_frequency_to_channel(int freq)
++#define IS_2GHZ_STEP(freq) (((freq) - 2407) % 5)
++int freq2chan2ghz(int freq)
+ {
+-	/* see 802.11-2007 17.3.8.3.2 and Annex J */
++	int start_chan = 0;
++	int start_freq = 2407;
++
++	/* Channel 14 is always special */
+ 	if (freq == 2484)
+ 		return 14;
++	if ((freq < 2412 || freq > 2492))
++		return (190 + (((freq - 2399)*2)/5));
++	else if (IS_2GHZ_STEP(freq)) {
++		/* For all channels which are not spaced by multiples of
++		 * 5MHz when starting from 2407.
++		 */
++		start_chan = 200;
++		start_freq = 2399;
++	} else if (freq >= 2477) {
++		/* If channel is spaced with 5MHz gap from 2407,
++		 * they are standard IEEE channels (1 - 13) till 2472.
++		 * Frequencies after 2472 will have channel numbers starting
++		 * from 221.
++		 */
++		start_chan = 221;
++		start_freq = 2477;
++	}
++
++	return start_chan + (freq - start_freq) / 5;
++}
++
++int ieee80211_frequency_to_channel(int freq)
++{
++	/* see 802.11-2007 17.3.8.3.2 and Annex J */
++	if (freq <= 2499)
++		return freq2chan2ghz(freq);
+ 	/* see 802.11ax D6.1 27.3.23.2 and Annex E */
+ 	else if (freq == 5935)
+ 		return 2;
+-	else if (freq < 2484)
+-		return (freq - 2407) / 5;
+ 	else if (freq >= 4910 && freq <= 4980)
+ 		return (freq - 4000) / 5;
+ 	else if (freq < 5950)
+-- 
+2.34.1
+
