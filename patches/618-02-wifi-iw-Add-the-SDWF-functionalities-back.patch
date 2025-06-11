@@ -51,7 +51,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +	if (*end != '\0' || value > MAX_RANGE(uint8_t) || errno == ERANGE)
 +		goto err;
 +
-+	strlcpy(macaddr, argv[1], MAC_ADDR_LEN);
++	snprintf(macaddr, sizeof(macaddr), "%s", argv[1]);
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_MAP);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
@@ -95,7 +95,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +	if (*end != '\0' || value > MAX_RANGE(uint8_t) || errno == ERANGE)
 +		goto err;
 +
-+	strlcpy(macaddr, argv[1], MAC_ADDR_LEN);
++	snprintf(macaddr, sizeof(macaddr), "%s", argv[1]);
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_UNMAP);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
@@ -132,7 +132,7 @@ Signed-off-by: Nagarajan Maran <quic_nmaran@quicinc.com>
 +		return -ENOBUFS;
 +
 +	errno = 0;
-+	strlcpy(macaddr, argv[0], MAC_ADDR_LEN);
++	snprintf(macaddr, sizeof(macaddr), "%s", argv[1]);
 +
 +	nla_put_u8(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_OPERATION, QCA_WLAN_VENDOR_SDWF_DEV_OPER_DEF_Q_MAP_GET);
 +	def_q_params = nla_nest_start(msg, QCA_WLAN_VENDOR_ATTR_SDWF_DEV_DEF_Q_PARAMS);
