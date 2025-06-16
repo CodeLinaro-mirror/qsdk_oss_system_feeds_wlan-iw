@@ -41,7 +41,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
  struct channels_ctx {
  	int last_band;
  	bool width_40;
-@@ -234,6 +236,59 @@ COMMAND(set, freq_khz,
+@@ -234,6 +236,51 @@ COMMAND(set, freq_khz,
  	"<control freq> [1|2|4|8|16] [<center1_freq> [<center2_freq>]]",
  	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_freq_khz, NULL);
  
@@ -56,11 +56,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
 +	if (res)
 +		return res;
 +
-+	NLA_PUT_U32(msg, NL80211_ATTR_ADD_MULTI_CHAN, true);
-+
 +	return put_chandef(msg, &chandef);
-+ nla_put_failure:
-+	return -ENOBUFS;
 +}
 +
 +COMMAND(add, freq,
@@ -85,11 +81,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
 +	if (res)
 +		return res;
 +
-+	NLA_PUT_U32(msg, NL80211_ATTR_DEL_MULTI_CHAN, true);
-+
 +	return put_chandef(msg, &chandef);
-+ nla_put_failure:
-+	return -ENOBUFS;
 +}
 +
 +COMMAND(del, freq, "<freq>\n",
@@ -101,7 +93,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
  static int handle_chan(struct nl80211_state *state, struct nl_msg *msg,
  		       int argc, char **argv,
  		       enum id_input id)
-@@ -252,6 +307,52 @@ COMMAND(set, channel, "<channel> [6G] [N
+@@ -252,6 +299,42 @@ COMMAND(set, channel, "<channel> [6G] [N
  COMMAND(set, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [6G] [ru-puncturing-bitmap <bitmap>]",
  	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_chan, NULL);
  
@@ -116,12 +108,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
 +	if (res)
 +		return res;
 +
-+	NLA_PUT_U32(msg, NL80211_ATTR_ADD_MULTI_CHAN, true);
-+
 +	return put_chandef(msg, &chandef);
-+
-+ nla_put_failure:
-+	return -ENOBUFS;
 +}
 +COMMAND(add, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]",
 +	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_add_chan, NULL);
@@ -139,12 +126,7 @@ Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
 +	if (res)
 +		return res;
 +
-+	NLA_PUT_U32(msg, NL80211_ATTR_DEL_MULTI_CHAN, true);
-+
 +	return put_chandef(msg, &chandef);
-+
-+ nla_put_failure:
-+	return -ENOBUFS;
 +}
 +COMMAND(del, channel, "<channel> [6G]",
 +	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_del_chan, NULL);
