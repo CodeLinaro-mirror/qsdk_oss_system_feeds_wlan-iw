@@ -1,0 +1,142 @@
+From 60e2964e3ce3a7c3abbe8b50338da52f25e39475 Mon Sep 17 00:00:00 2001
+From: Divya R <divraj@qti.qualcomm.com>
+Date: Wed, 3 Jun 2026 10:08:36 +0530
+Subject: [PATCH] new iw patch
+
+Add support to enable/disable station DFS support.
+
+iw phy <phyname> set sta_dfs_en <0|1>
+iw phy <phyname> get sta_dfs_en
+
+Patch-dependency: None
+
+Patch-work: None
+
+Signed-off-by: Karthik M <karm@qti.qualcomm.com>
+---
+ nl80211.h |  4 ++++
+ phy.c     | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+
+diff --git a/nl80211.h b/nl80211.h
+index 5b23b4e..25eda6d 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -3037,6 +3037,19 @@ enum nl80211_commands {
+  * @NL80211_ATTR_HE_MUEDCA_MODE: Attribute that denotes the mode of setting MU
+  *	EDCA parameters(See enum nl80211_muedca_mode).
+  *
++ * @NL80211_ATTR_BEACON_TX_SYNC_SUPPORT: Flag attribute indicating that HW
++ *	will transmit beacons for all bands at the same time (burst mode) if
++ *	the beacon intervals are the same.
++ *
++ * @NL80211_ATTR_MAX_CH_SWITCH_TIME: u32 attribute carrying the Switch Time
++ *	field from the MCST (Max Channel Switch Time) element, indicating the
++ *	time delta between the time the last beacon is transmitted by the AP in
++ *	the current channel and the expected time of the first beacon
++ *	transmitted by the AP in the new channel, expressed in TUs.
++ *
++ * @NL80211_ATTR_STA_DFS_EN: flag/u8 attribute to enable or disable
++ *	Station DFS (Dynamic Frequency Selection) support. Only applicable
++ *	in ETSI regulatory domains. 0 = disabled, 1 = enabled.
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3660,6 +3673,12 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_HE_MUEDCA_MODE,
+ 
+ 	NL80211_ATTR_LOW_POWER_20MHZ,
++
++	NL80211_ATTR_BEACON_TX_SYNC_SUPPORT,
++
++	NL80211_ATTR_MAX_CH_SWITCH_TIME,
++
++	NL80211_ATTR_STA_DFS_EN,
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+diff --git a/phy.c b/phy.c
+index d2c5470..378bdad 100644
+--- a/phy.c
++++ b/phy.c
+@@ -971,6 +971,34 @@ COMMAND(set, distance, "<auto|distance>",
+ 	"To disable dynack set valid value for coverage class.\n"
+ 	"Valid values: 0 - 114750");
+ 
++static int handle_set_sta_dfs_en(struct nl80211_state *state,
++				 struct nl_msg *msg,
++				 int argc, char **argv,
++				 enum id_input id)
++{
++	int sta_dfs_en;
++
++	if (argc != 1)
++		return 1;
++
++	sta_dfs_en = atoi(argv[0]);
++	if (sta_dfs_en < 0 || sta_dfs_en > 1)
++		return 1;
++
++	NLA_PUT_U8(msg, NL80211_ATTR_STA_DFS_EN, sta_dfs_en);
++
++	return 0;
++
++nla_put_failure:
++	return -ENOBUFS;
++}
++COMMAND(set, sta_dfs_en, "<0|1>",
++	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_set_sta_dfs_en,
++	"Set station DFS enable state. Valid values: 0 (disable), 1 (enable).\n"
++	"A sta/client device should enable sta-DFS feature if its\n"
++	"transmit power is greater than or equal to 23 dBm.\n"
++	"Usage: iw phy <phyname> set sta_dfs_en <0|1>");
++
+ static int handle_txpower(struct nl80211_state *state,
+ 			  struct nl_msg *msg,
+ 			  int argc, char **argv,
+@@ -1217,6 +1245,42 @@ COMMAND(get, txq, "",
+ 	NL80211_CMD_GET_WIPHY, 0, CIB_PHY, handle_get_txq,
+ 	"Get TXQ parameters.");
+ 
++static int print_sta_dfs_en_handler(struct nl_msg *msg, void *arg)
++{
++	struct nlattr *attrs[NL80211_ATTR_MAX + 1];
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++
++	nla_parse(attrs, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
++		  genlmsg_attrlen(gnlh, 0), NULL);
++
++	if (attrs[NL80211_ATTR_STA_DFS_EN])
++		printf("sta_dfs_en:\t\t%u\n",
++		       nla_get_u8(attrs[NL80211_ATTR_STA_DFS_EN]));
++
++	return NL_SKIP;
++}
++
++static int handle_get_sta_dfs_en(struct nl80211_state *state,
++				 struct nl_msg *msg,
++				 int argc, char **argv,
++				 enum id_input id)
++{
++	if (argc)
++		return 1;
++
++	NLA_PUT_FLAG(msg, NL80211_ATTR_SPLIT_WIPHY_DUMP);
++	nlmsg_hdr(msg)->nlmsg_flags |= NLM_F_DUMP;
++	register_handler(print_sta_dfs_en_handler, NULL);
++	return 0;
++
++nla_put_failure:
++	return -ENOBUFS;
++}
++COMMAND(get, sta_dfs_en, "",
++	NL80211_CMD_GET_WIPHY, 0, CIB_PHY, handle_get_sta_dfs_en,
++	"Get station DFS enable state.\n"
++	"Usage: iw phy <phyname> get sta_dfs_en");
++
+ static int handle_antenna_gain(struct nl80211_state *state,
+ 			       struct nl_msg *msg,
+ 			       int argc, char **argv,
+-- 
+2.34.1
+
