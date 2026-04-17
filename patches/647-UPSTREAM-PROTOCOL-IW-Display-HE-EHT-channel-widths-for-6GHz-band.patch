@@ -1,0 +1,178 @@
+From: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+Date: Thu, 10 Apr 2026 00:00:00 +0000
+Subject: [PATCH] UPSTREAM:PROTOCOL:IW: Display HE/EHT channel widths for 6 GHz band
+
+iw phy channels shows only "20MHz" for all 6 GHz channels because the
+"Channel widths" logic gates VHT80/VHT160 display on ctx->width_80 and
+ctx->width_160, which are set only when NL80211_BAND_ATTR_VHT_CAPA is
+present. The 6 GHz band has no VHT, so those flags are never set.
+
+Fix by parsing NL80211_BAND_ATTR_IFTYPE_DATA when the band is 6 GHz to
+extract HE/EHT PHY capabilities and display the correct widths:
+
+  HE PHY cap byte 0:
+    0x04: 40+80 MHz in 5/6 GHz -> HE40, HE80 (6G)
+    0x08: 160 MHz in 5/6 GHz   -> HE160 (6G)
+
+  EHT PHY cap byte 0:
+    0x02: 320 MHz in 6 GHz -> EHT320 (6G)
+
+  EHT 40/80/160 MHz support is implied by the corresponding HE PHY
+  cap bits when EHT is present on the band:
+    HE 40+80 MHz in 6G + EHT -> EHT40, EHT80 (6G)
+    HE 160 MHz in 6G + EHT   -> EHT160 (6G)
+
+Feature: REGULATORY
+
+Patch-dependency: None
+Link: [PATCH] iw: phy: display HE/EHT channel widths for 6 GHz channels
+
+Change-Id: I027710a2785fad4c26ab6f9a0cab6db8214e5286
+Signed-off-by: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+---
+--- a/phy.c
++++ b/phy.c
+@@ -22,6 +22,13 @@
+ 	bool width_40;
+ 	bool width_80;
+ 	bool width_160;
++	bool he_width_40;
++	bool he_width_80;
++	bool he_width_160;
++	bool eht_width_40;
++	bool eht_width_80;
++	bool eht_width_160;
++	bool eht_width_320;
+ };
+ 
+ static char *dfs_state_name(enum nl80211_dfs_state state)
+@@ -61,6 +68,65 @@
+ 		       1.0 * nla_get_u32(tb_txpwr[NL80211_6GHZ_TXPOWER_ATTR_VLP]));
+ }
+ 
++static void parse_6ghz_he_eht_widths(struct nlattr *iftype_data,
++				     struct channels_ctx *ctx)
++{
++	struct nlattr *tb_iftype[NL80211_BAND_IFTYPE_ATTR_MAX + 1];
++	struct nlattr *nl_iftype;
++	bool has_eht = false;
++	int rem_iftype;
++	__u8 *phy;
++
++	nla_for_each_nested(nl_iftype, iftype_data, rem_iftype) {
++		nla_parse(tb_iftype, NL80211_BAND_IFTYPE_ATTR_MAX,
++			  nla_data(nl_iftype), nla_len(nl_iftype), NULL);
++
++		if (tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY] &&
++		    nla_len(tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]) >= 1) {
++			phy = nla_data(tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]);
++			/*
++			 * HE PHY cap byte 0:
++			 *   0x04: 40+80 MHz in 5/6 GHz
++			 *   0x08: 160 MHz in 5/6 GHz
++			 */
++			if (phy[0] & 0x04) {
++				ctx->he_width_40 = true;
++				ctx->he_width_80 = true;
++			}
++			if (phy[0] & 0x08)
++				ctx->he_width_160 = true;
++		}
++
++		if (tb_iftype[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY] &&
++		    nla_len(tb_iftype[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY]) >= 1) {
++			phy = nla_data(tb_iftype[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY]);
++			/*
++			 * EHT PHY cap byte 0 (B1): 320 MHz in 6 GHz.
++			 * EHT 40/80/160 MHz support is implied by the
++			 * corresponding HE PHY cap bits when EHT is present.
++			 */
++			has_eht = true;
++			if (phy[0] & 0x02)
++				ctx->eht_width_320 = true;
++		}
++
++		/* One entry is enough to determine band capabilities */
++		break;
++	}
++
++	/*
++	 * EHT 40/80/160 MHz in 6 GHz: implied by HE 40+80/160 + EHT present.
++	 */
++	if (has_eht) {
++		if (ctx->he_width_40)
++			ctx->eht_width_40 = true;
++		if (ctx->he_width_80)
++			ctx->eht_width_80 = true;
++		if (ctx->he_width_160)
++			ctx->eht_width_160 = true;
++	}
++}
++
+ static int print_channels_handler(struct nl_msg *msg, void *arg)
+ {
+ 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+@@ -70,6 +136,7 @@
+ 	struct nlattr *tb_freq[NL80211_FREQUENCY_ATTR_MAX + 1];
+ 	struct nlattr *nl_band;
+ 	struct nlattr *nl_freq;
++	struct nlattr *iftype_data;
+ 	int rem_band, rem_freq;
+ 
+ 	nla_parse(tb_msg, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0), genlmsg_attrlen(gnlh, 0), NULL);
+@@ -81,6 +148,13 @@
+ 				ctx->width_40 = false;
+ 				ctx->width_80 = false;
+ 				ctx->width_160 = false;
++				ctx->he_width_40 = false;
++				ctx->he_width_80 = false;
++				ctx->he_width_160 = false;
++				ctx->eht_width_40 = false;
++				ctx->eht_width_80 = false;
++				ctx->eht_width_160 = false;
++				ctx->eht_width_320 = false;
+ 				ctx->last_band = nl_band->nla_type;
+ 			}
+ 
+@@ -109,6 +183,11 @@
+ 				}
+ 			}
+ 
++			/* Parse HE/EHT caps from iftype data for 6 GHz width display */
++			iftype_data = tb_band[NL80211_BAND_ATTR_IFTYPE_DATA];
++			if (nl_band->nla_type == NL80211_BAND_6GHZ && iftype_data)
++				parse_6ghz_he_eht_widths(iftype_data, ctx);
++
+ 			if (tb_band[NL80211_BAND_ATTR_FREQS]) {
+ 				nla_for_each_nested(nl_freq, tb_band[NL80211_BAND_ATTR_FREQS], rem_freq) {
+ 					uint32_t freq;
+@@ -152,6 +231,29 @@
+ 						printf(" VHT80");
+ 					if (ctx->width_160 && !tb_freq[NL80211_FREQUENCY_ATTR_NO_160MHZ])
+ 						printf(" VHT160");
++					if (ctx->he_width_40 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS])
++						printf(" HE40");
++					if (ctx->eht_width_40 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS])
++						printf(" EHT40");
++					if (ctx->he_width_80 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_80MHZ])
++						printf(" HE80");
++					if (ctx->eht_width_80 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_80MHZ])
++						printf(" EHT80");
++					if (ctx->he_width_160 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_160MHZ])
++						printf(" HE160");
++					if (ctx->eht_width_160 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_160MHZ])
++						printf(" EHT160");
++					if (ctx->eht_width_320 &&
++					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_320MHZ])
++						printf(" EHT320");
+ 					printf("\n");
+ 
+ 					if (!tb_freq[NL80211_FREQUENCY_ATTR_DISABLED] && tb_freq[NL80211_FREQUENCY_ATTR_DFS_STATE]) {
