@@ -1,0 +1,121 @@
+From 52f601cfa23c38facf6ffb9b2cb06860c74c6f0a Mon Sep 17 00:00:00 2001
+From: Muna Sinada <muna.sinada@oss.qualcomm.com>
+Date: Tue, 21 Apr 2026 16:31:05 -0700
+Subject: [PATCH] UPSTREAM:CP:iw: fix PCIe genxlane disable failure
+
+When issuing PCIe genxlane disable command, "Invalid argument" error
+is returned. This is due to two reasons: There is netlink attribute
+mismatch with kernel and even when disable, there are checks for the
+remaining parameters.
+
+Update netlink attributes to match kernel. Check and extract
+config/gen/lane parameters only when command is to enable.
+
+Patch-dependency: I00bebcf15 (UPSTREAM:CP:iw: add powersave command)
+
+Patch-work: None
+
+Fixes: None
+
+Signed-off-by: Muna Sinada <muna.sinada@oss.qualcomm.com>
+---
+ nl80211.h   |  4 ++++
+ powersave.c | 29 +++++++++++++++++------------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
+
+diff --git a/nl80211.h b/nl80211.h
+index c6d279b..f36d075 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -1637,6 +1637,10 @@ enum nl80211_commands {
+ 
+ 	NL80211_CMD_LINK_REMOVAL_COMPLETED,
+ 
++	NL80211_CMD_ERP,
++
++	NL80211_CMD_QOS_MGMT,
++
+ 	NL80211_CMD_AP_POWER_SAVE,
+ 	/* add new commands above here */
+ 
+diff --git a/powersave.c b/powersave.c
+index 07edbbb..aec68fa 100644
+--- a/powersave.c
++++ b/powersave.c
+@@ -131,10 +131,12 @@ static int handle_pcie_powersave(struct nl80211_state *state,
+ 	else
+ 		return -EINVAL;
+ 
+-	if (parse_u8_arg(argv[1], "config type", UCHAR_MAX, &config_type))
++	/* If trying to disable, remaining parameters are not needed */
++	if (enable && parse_u8_arg(argv[1], "config type", UCHAR_MAX,
++				   &config_type))
+ 		return -EINVAL;
+ 
+-	if (type == PCI_TYPE_GEN_X_LANE) {
++	if (enable && type == PCI_TYPE_GEN_X_LANE) {
+ 		if (argc != 4)
+ 			return HANDLER_RET_USAGE;
+ 
+@@ -142,7 +144,7 @@ static int handle_pcie_powersave(struct nl80211_state *state,
+ 		    parse_u8_arg(argv[3], "pcie lane", UCHAR_MAX, &pcie_lane))
+ 			return -EINVAL;
+ 	} else {
+-		if (argc != 2)
++		if (enable && argc != 2)
+ 			return HANDLER_RET_USAGE;
+ 	}
+ 
+@@ -152,11 +154,14 @@ static int handle_pcie_powersave(struct nl80211_state *state,
+ 
+ 	NLA_PUT_U8(msg, NL80211_PCIE_ATTR_TYPE, type);
+ 	NLA_PUT_U8(msg, NL80211_PCIE_ATTR_ENABLE, enable);
+-	NLA_PUT_U8(msg, NL80211_PCIE_ATTR_CONFIG_TYPE, config_type);
+ 
+-	if (type == PCI_TYPE_GEN_X_LANE) {
+-		NLA_PUT_U8(msg, NL80211_PCIE_ATTR_GEN, pcie_gen);
+-		NLA_PUT_U8(msg, NL80211_PCIE_ATTR_LANE, pcie_lane);
++	if (enable) {
++		NLA_PUT_U8(msg, NL80211_PCIE_ATTR_CONFIG_TYPE, config_type);
++
++		if (type == PCI_TYPE_GEN_X_LANE) {
++			NLA_PUT_U8(msg, NL80211_PCIE_ATTR_GEN, pcie_gen);
++			NLA_PUT_U8(msg, NL80211_PCIE_ATTR_LANE, pcie_lane);
++		}
+ 	}
+ 
+ 	nla_nest_end(msg, pcie_attrs);
+@@ -232,15 +237,15 @@ static int handle_dps_powersave(struct nl80211_state *state,
+ 
+ COMMAND_ALIAS(set, powersave,
+ 	      "link-id <link id> PCIe <genxlane|low_power> "
+-	      "<enable> <config type> [<pcie gen> <pcie lane>]",
++	      "<enable|disable> <config type> [<pcie gen> <pcie lane>]",
+ 	      NL80211_CMD_AP_POWER_SAVE, 0, CIB_NETDEV, handle_pcie_powersave,
+ 	      "Configure PCIe powersave transitions for a specific MLO link.\n"
+ 	      "Example:\n"
+-	      "\tiw dev <devname> set powersave link-id <id> PCIe genxlane 1 0 4 1",
++	      "\tiw dev <devname> set powersave link-id <id> PCIe genxlane enable 0 4 1",
+ 	      select_powersave_cmd, powersave_cmd_pcie);
+ 
+ COMMAND_ALIAS(set, powersave,
+-	      "link-id <link id> DCVS <on|off|no_limit|config type>",
++	      "link-id <link id> DCVS <on|off|no_limit>",
+ 	      NL80211_CMD_AP_POWER_SAVE, 0, CIB_NETDEV, handle_dcvs_powersave,
+ 	      "Configure Dynamic Clock and Voltage Scaling mode for a link.\n"
+ 	      "Example:\n"
+@@ -248,9 +253,9 @@ COMMAND_ALIAS(set, powersave,
+ 	      select_powersave_cmd, powersave_cmd_dcvs);
+ 
+ COMMAND_ALIAS(set, powersave,
+-	      "link-id <link id> dps_assist <0|1>",
++	      "link-id <link id> dps_assist <enable|disable>",
+ 	      NL80211_CMD_AP_POWER_SAVE, 0, CIB_NETDEV, handle_dps_powersave,
+ 	      "Enable or disable DPS assist role for a link.\n"
+ 	      "Example:\n"
+-	      "\tiw dev <devname> set powersave link-id <id> dps_assist 1",
++	      "\tiw dev <devname> set powersave link-id <id> dps_assist enable",
+ 	      select_powersave_cmd, powersave_cmd_dps);
+-- 
+2.34.1
+
