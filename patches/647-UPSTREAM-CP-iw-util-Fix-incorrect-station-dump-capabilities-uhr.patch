@@ -1,0 +1,57 @@
+From 4e4a27eb5972918eb55facc9c974b7af30e74b72 Mon Sep 17 00:00:00 2001
+From: Vishnu Vardhan Bantanahal <vishvard@qti.qualcomm.com>
+Date: Fri, 24 Apr 2026 12:47:53 +0530
+Subject: [PATCH] iw: Changes to account UHR data in Station dump
+
+Following changes will ensure the station dump info is rightly populated
+in UHR mode for various entities such as MCS, NSS, GI etc.
+
+Signed-off-by: Vishnu Vardhan Bantanahal <vishvard@qti.qualcomm.com>
+---
+ nl80211.h |  6 ++++++
+ station.c | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/nl80211.h b/nl80211.h
+index b6b892f..ed4b9b8 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -4062,6 +4062,12 @@ enum nl80211_rate_info {
+ 	NL80211_RATE_INFO_4_MHZ_WIDTH,
+ 	NL80211_RATE_INFO_8_MHZ_WIDTH,
+ 	NL80211_RATE_INFO_16_MHZ_WIDTH,
++	NL80211_RATE_INFO_UHR_MCS,
++	NL80211_RATE_INFO_UHR_NSS,
++	NL80211_RATE_INFO_UHR_GI,
++	NL80211_RATE_INFO_UHR_RU_ALLOC,
++	NL80211_RATE_INFO_UHR_ELR,
++	NL80211_RATE_INFO_UHR_IM,
+
+ 	/* keep last */
+ 	__NL80211_RATE_INFO_AFTER_LAST,
+diff --git a/station.c b/station.c
+index 1382e13..0e6823a 100644
+--- a/station.c
++++ b/station.c
+@@ -297,6 +297,18 @@ void parse_bitrate(struct nlattr *bitrate_attr, char *buf, int buflen)
+ 	if (rinfo[NL80211_RATE_INFO_EHT_RU_ALLOC])
+ 		pos += snprintf(pos, buflen - (pos - buf),
+ 				" EHT-RU-ALLOC %d", nla_get_u8(rinfo[NL80211_RATE_INFO_EHT_RU_ALLOC]));
++	if (rinfo[NL80211_RATE_INFO_UHR_MCS])
++		pos += snprintf(pos, buflen - (pos - buf),
++				" UHR-MCS %d", nla_get_u8(rinfo[NL80211_RATE_INFO_UHR_MCS]));
++	if (rinfo[NL80211_RATE_INFO_UHR_NSS])
++		pos += snprintf(pos, buflen - (pos - buf),
++				" UHR-NSS %d", nla_get_u8(rinfo[NL80211_RATE_INFO_UHR_NSS]));
++	if (rinfo[NL80211_RATE_INFO_UHR_GI])
++		pos += snprintf(pos, buflen - (pos - buf),
++				" UHR-GI %d", nla_get_u8(rinfo[NL80211_RATE_INFO_UHR_GI]));
++	if (rinfo[NL80211_RATE_INFO_UHR_RU_ALLOC])
++		pos += snprintf(pos, buflen - (pos - buf),
++				" UHR-RU-ALLOC %d", nla_get_u8(rinfo[NL80211_RATE_INFO_UHR_RU_ALLOC]));
+ }
+
+ static char *get_chain_signal(struct nlattr *attr_list)
+--
+2.34.1
+

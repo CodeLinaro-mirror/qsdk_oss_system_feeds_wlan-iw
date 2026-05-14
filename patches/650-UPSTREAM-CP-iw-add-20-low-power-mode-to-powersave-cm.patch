@@ -1,0 +1,133 @@
+From 36de94e2059abf5d8280f584412f6bfd48f42694 Mon Sep 17 00:00:00 2001
+From: Muna Sinada <muna.sinada@oss.qualcomm.com>
+Date: Mon, 20 Apr 2026 18:32:08 -0700
+Subject: [PATCH] UPSTREAM:CP:iw: add 20 low power mode to powersave cmd
+
+Add 20 low power mode to iw powersave command. This addition to the
+command allow configuration for 20 MHz low power mode.
+
+iw dev <devname> set powersave link-id <id> low_power_20mhz [enable|disable]
+
+Patch-dependency: I00bebcf15 (UPSTREAM:CP:iw: add powersave command)
+
+Patch-work: None
+
+Fixes: None
+
+Signed-off-by: Muna Sinada <muna.sinada@oss.qualcomm.com>
+---
+ nl80211.h   |  2 ++
+ powersave.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 48 insertions(+), 5 deletions(-)
+
+diff --git a/nl80211.h b/nl80211.h
+index f36d075..b748be1 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -3658,6 +3658,8 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_DPS_ASSIST,
+ 
+ 	NL80211_ATTR_HE_MUEDCA_MODE,
++
++	NL80211_ATTR_LOW_POWER_20MHZ,
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+diff --git a/powersave.c b/powersave.c
+index aec68fa..3798cd0 100644
+--- a/powersave.c
++++ b/powersave.c
+@@ -27,6 +27,7 @@ enum pcie_type {
+ static const struct cmd *powersave_cmd_pcie;
+ static const struct cmd *powersave_cmd_dcvs;
+ static const struct cmd *powersave_cmd_dps;
++static const struct cmd *powersave_cmd_low_pwr_20mhz;
+ 
+ static bool token_eq(const char *a, const char *b)
+ {
+@@ -90,6 +91,9 @@ static const struct cmd *select_powersave_cmd(int argc, char **argv)
+ 	if (token_eq(argv[0], "dps_assist"))
+ 		return powersave_cmd_dps;
+ 
++	if (token_eq(argv[0], "low_power_20mhz"))
++		return powersave_cmd_low_pwr_20mhz;
++
+ 	return NULL;
+ }
+ 
+@@ -202,9 +206,8 @@ static int handle_dcvs_powersave(struct nl80211_state *state,
+ 	return -ENOBUFS;
+ }
+ 
+-
+-#define DPS_ASSIST_DISABLE 0
+-#define DPS_ASSIST_ENABLE 1
++#define POWER_SAVE_DISABLE 0
++#define POWER_SAVE_ENABLE 1
+ 
+ static int handle_dps_powersave(struct nl80211_state *state,
+ 				struct nl_msg *msg,
+@@ -222,9 +225,9 @@ static int handle_dps_powersave(struct nl80211_state *state,
+ 		return HANDLER_RET_USAGE;
+ 
+ 	if (token_eq(argv[1], "enable"))
+-		state_val = DPS_ASSIST_ENABLE;
++		state_val = POWER_SAVE_ENABLE;
+ 	else if (token_eq(argv[1], "disable"))
+-		state_val = DPS_ASSIST_DISABLE;
++		state_val = POWER_SAVE_DISABLE;
+ 	else
+ 		return -EINVAL;
+ 
+@@ -235,6 +238,36 @@ static int handle_dps_powersave(struct nl80211_state *state,
+ 	return -ENOBUFS;
+ }
+ 
++static int handle_low_pwr_20mhz_powersave(struct nl80211_state *state,
++					  struct nl_msg *msg,
++					  int argc, char **argv,
++					  enum id_input id)
++{
++	__u8 state_val;
++	int ret;
++
++	ret = parse_link_id(msg, &argc, &argv);
++	if (ret)
++		return ret;
++
++	if (argc != 2 || !token_eq(argv[0], "low_power_20mhz"))
++		return HANDLER_RET_USAGE;
++
++	if (token_eq(argv[1], "enable"))
++		state_val = POWER_SAVE_ENABLE;
++	else if (token_eq(argv[1], "disable"))
++		state_val = POWER_SAVE_DISABLE;
++	else
++		return -EINVAL;
++
++	NLA_PUT_U8(msg, NL80211_ATTR_LOW_POWER_20MHZ, state_val);
++
++	return 0;
++ nla_put_failure:
++	return -ENOBUFS;
++}
++
++
+ COMMAND_ALIAS(set, powersave,
+ 	      "link-id <link id> PCIe <genxlane|low_power> "
+ 	      "<enable|disable> <config type> [<pcie gen> <pcie lane>]",
+@@ -259,3 +292,11 @@ COMMAND_ALIAS(set, powersave,
+ 	      "Example:\n"
+ 	      "\tiw dev <devname> set powersave link-id <id> dps_assist enable",
+ 	      select_powersave_cmd, powersave_cmd_dps);
++
++COMMAND_ALIAS(set, powersave,
++	      "link-id <link id> low_power_20mhz <enable|disable>",
++	      NL80211_CMD_AP_POWER_SAVE, 0, CIB_NETDEV, handle_low_pwr_20mhz_powersave,
++	      "Enable or disable 20MHz low power mode for a link.\n"
++	      "Example:\n"
++	      "\tiw dev <devname> set powersave link-id <id> low_power_20mhz enable",
++	      select_powersave_cmd, powersave_cmd_low_pwr_20mhz);
+-- 
+2.34.1
+
