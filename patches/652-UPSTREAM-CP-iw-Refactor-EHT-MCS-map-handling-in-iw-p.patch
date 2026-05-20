@@ -1,0 +1,186 @@
+From 9457a6fab17fc880fd8ac41b057317c46e4a2dd1 Mon Sep 17 00:00:00 2001
+From: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+Date: Wed, 20 May 2026 13:28:01 +0530
+Subject: [PATCH 1/2] UPSTREAM:CP:iw: Refactor EHT MCS map handling in iw phy
+ output
+
+Refactor the existing code that handles the EHT MCS map in "iw phy"
+output by introducing a new helper function, __print_supported_mcs_nss_set().
+This function will also be used to add support for the UHR MCS map
+in "iw phy" output.
+
+Patch-dependency: None
+
+Signed-off-by: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+---
+ util.c | 147 +++++++++++++++++++++++++++++++--------------------------
+ 1 file changed, 80 insertions(+), 67 deletions(-)
+
+diff --git a/util.c b/util.c
+index 148d92f..7c3f120 100644
+--- a/util.c
++++ b/util.c
+@@ -1534,6 +1534,85 @@ void print_he_info(struct nlattr *nl_iftype)
+ 			true);
+ }
+ 
++static void __print_supported_mcs_nss_set(int band,
++					  const __u8 *eht_phy_cap,
++					  const __u8 *eht_mcs_set, size_t eht_mcs_len,
++					  const __u16 *he_phy_cap,
++					  bool from_ap,
++					  bool indent)
++{
++	unsigned int i;
++	const char *pre = indent ? "\t" : "";
++
++	if (!from_ap &&
++	    !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8))) {
++		static const char * const mcs[] = { "0-7", "8-9", "10-11", "12-13" };
++		printf("%s\t\tEHT-MCS Map (20 Mhz Non-AP STA) (0x", pre);
++		for (i = 0; i < eht_mcs_len; i++)
++			printf("%02x", ((__u8 *)eht_mcs_set)[i]);
++		printf("):\n");
++
++		for (i = 0; i < 4; i++) {
++			printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
++			       pre, mcs[i], eht_mcs_set[i] & 0xf);
++			printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
++			       pre, mcs[i], eht_mcs_set[i] >> 4);
++		}
++	} else {
++		static const char * const mcs[] = { "0-9", "10-11", "12-13"};
++
++		/* Bit 1 corresponds to 2.4Ghz 40Mhz support
++		 * Bit 2 corresponds to 5/6Ghz 40 and 80Mhz support
++		 * If no Channel Width bits are set, but we are an AP, we use
++		 * this MCS logic also.
++		 */
++		if (he_phy_cap[0] & ((BIT(1) | BIT(2)) << 8) ||
++		    (from_ap && !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8)))) {
++			printf("%s\t\tEHT-MCS Map (BW <= 80) (0x", pre);
++			for (i = 0; i < 3; i++)
++				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
++			printf("):\n");
++
++			for (i = 0; i < 3; i++) {
++				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] & 0xf);
++				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] >> 4);
++			}
++		}
++		eht_mcs_set += 3;
++
++		if (he_phy_cap[0] & (BIT(3) << 8)) {
++			printf("%s\t\tEHT-MCS Map (BW = 160) (0x", pre);
++			for (i = 0; i < 3; i++)
++				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
++			printf("):\n");
++
++			for (i = 0; i < 3; i++) {
++				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] & 0xf);
++				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] >> 4);
++			}
++		}
++
++		eht_mcs_set += 3;
++		if (band == NL80211_BAND_6GHZ && (eht_phy_cap[0] & BIT(1))) {
++			printf("%s\t\tEHT-MCS Map (BW = 320) (0x", pre);
++			for (i = 0; i < 3; i++)
++				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
++			printf("):\n");
++
++			for (i = 0; i < 3; i++) {
++				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] & 0xf);
++				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
++				       pre, mcs[i], eht_mcs_set[i] >> 4);
++			}
++		}
++	}
++}
++
+ static void __print_eht_capa(int band,
+ 			     const __u8 *mac_cap,
+ 			     const __u8 *phy_cap,
+@@ -1634,73 +1713,7 @@ static void __print_eht_capa(int band,
+ 	PRINT_EHT_PHY_CAP(2, 0, "Rx 1024-QAM In Wider Bandwidth DL OFDMA Supported");
+ 	PRINT_EHT_PHY_CAP(2, 1, "Rx 4096-QAM In Wider Bandwidth DL OFDMA Supported");
+ 
+-	if (!from_ap &&
+-	    !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8))) {
+-		static const char * const mcs[] = { "0-7", "8-9", "10-11", "12-13" };
+-		printf("%s\t\tEHT-MCS Map (20 Mhz Non-AP STA) (0x", pre);
+-		for (i = 0; i < mcs_len; i++)
+-			printf("%02x", ((__u8 *)mcs_set)[i]);
+-		printf("):\n");
+-
+-		for (i = 0; i < 4; i++) {
+-			printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
+-			       pre, mcs[i], mcs_set[i] & 0xf);
+-			printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
+-			       pre, mcs[i], mcs_set[i] >> 4);
+-		}
+-	} else {
+-		static const char * const mcs[] = { "0-9", "10-11", "12-13"};
+-
+-		/* Bit 1 corresponds to 2.4Ghz 40Mhz support
+-		 * Bit 2 corresponds to 5/6Ghz 40 and 80Mhz support
+-		 * If no Channel Width bits are set, but we are an AP, we use
+-		 * this MCS logic also.
+-		 */
+-		if (he_phy_cap[0] & ((BIT(1) | BIT(2)) << 8) ||
+-		    (from_ap && !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8)))) {
+-			printf("%s\t\tEHT-MCS Map (BW <= 80) (0x", pre);
+-			for (i = 0; i < 3; i++)
+-				printf("%02x", ((__u8 *)mcs_set)[i]);
+-			printf("):\n");
+-
+-			for (i = 0; i < 3; i++) {
+-				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] & 0xf);
+-				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] >> 4);
+-			}
+-		}
+-		mcs_set += 3;
+-
+-		if (he_phy_cap[0] & (BIT(3) << 8)) {
+-			printf("%s\t\tEHT-MCS Map (BW = 160) (0x", pre);
+-			for (i = 0; i < 3; i++)
+-				printf("%02x", ((__u8 *)mcs_set)[i]);
+-			printf("):\n");
+-
+-			for (i = 0; i < 3; i++) {
+-				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] & 0xf);
+-				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] >> 4);
+-			}
+-		}
+-
+-		mcs_set += 3;
+-		if (band == NL80211_BAND_6GHZ && (phy_cap[0] & BIT(1))) {
+-			printf("%s\t\tEHT-MCS Map (BW = 320) (0x", pre);
+-			for (i = 0; i < 3; i++)
+-				printf("%02x", ((__u8 *)mcs_set)[i]);
+-			printf("):\n");
+-
+-			for (i = 0; i < 3; i++) {
+-				printf("%s\t\t\tRx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] & 0xf);
+-				printf("%s\t\t\tTx Max NSS for MCS %s: %u\n",
+-				       pre, mcs[i], mcs_set[i] >> 4);
+-			}
+-		}
+-	}
++	__print_supported_mcs_nss_set(band, phy_cap, mcs_set, mcs_len, he_phy_cap, from_ap, indent);
+ 
+ 	if (ppet && ppet_len && (phy_cap[1] & BIT(11))) {
+ 		printf("%s\t\tEHT PPE Thresholds ", pre);
+-- 
+2.34.1
+
