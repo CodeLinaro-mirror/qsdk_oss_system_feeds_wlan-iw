@@ -1,0 +1,85 @@
+From 8b85f3859a4a43b4da9f73905e9ef3beb00e5daa Mon Sep 17 00:00:00 2001
+From: Lokitha Thangavel <lthangav@qti.qualcomm.com>
+Date: Fri, 22 May 2026 15:33:13 +0530
+Subject: [PATCH] UPSTREAM:CP: iw: Add support for per-radio TX power
+
+In a single-wiphy architecture, a single wiphy may correspond to
+multiple radios. The existing "iw phy phyXX set txpower"
+command does not carry a radio identifier, so it cannot target a
+specific radio. Also, when no netdev has been created yet,
+the CIB_NETDEV path is unavailable.
+
+Extend the CIB_PHY txpower command to accept an optional
+"radio <idx>" argument. When the radio index is omitted the
+existing behaviour (value gets applied to all radios) is preserved.
+
+New command usage:
+iw phy <phyname> set txpower radio <radio_idx> <auto|fixed|limit> <txpower in mBm>
+
+Feature: REGULATORY
+Patch-dependency: None
+
+Signed-off-by: Lokitha Thangavel <lthangav@qti.qualcomm.com>
+---
+ phy.c | 29 ++++++++++++++++++++++++++---
+ 1 file changed, 26 insertions(+), 3 deletions(-)
+
+diff --git a/phy.c b/phy.c
+index d2c5470..2e7f954 100644
+--- a/phy.c
++++ b/phy.c
+@@ -978,9 +978,32 @@ static int handle_txpower(struct nl80211_state *state,
+ {
+ 	enum nl80211_tx_power_setting type;
+ 	int mbm, i = 0, max_argc;
++	bool phy_path = (id == II_PHY_NAME || id == II_PHY_IDX);
++
++	/* Check if a radio index is provided (CIB_PHY path only) */
++	if (phy_path && argc >= 2 && !strcmp(argv[0], "radio")) {
++		unsigned long radio_idx;
++		char *end;
++
++		if (argv[1][0] == '-') {
++			printf("Invalid value: %s, radio index cannot be negative\n",
++			       argv[1]);
++			return 1;
++		}
++
++		radio_idx = strtoul(argv[1], &end, 10);
++		if (*end || errno == ERANGE || radio_idx > UINT8_MAX) {
++			printf("Invalid value for radio index\n");
++			return 1;
++		}
++
++		NLA_PUT_U8(msg, NL80211_ATTR_WIPHY_RADIO_INDEX, (uint8_t)radio_idx);
++		i = 2;
++		argc -= 2;
++	}
+ 
+ 	/* get the required args */
+-	if (argc == 3 || argc == 4) {
++	if (!phy_path && (argc == 3 || argc == 4)) {
+ 		max_argc = 4;
+ 
+ 		if (!strcmp(argv[0], "-l")) {
+@@ -1029,7 +1052,7 @@ static int handle_txpower(struct nl80211_state *state,
+ 		if (*endptr)
+ 			return 2;
+ 		NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_TX_POWER_LEVEL, mbm);
+-	} else if (argc != max_argc-1)
++	} else if (argc != max_argc - 1)
+ 		return 1;
+ 
+ 	return 0;
+@@ -1037,7 +1060,7 @@ static int handle_txpower(struct nl80211_state *state,
+  nla_put_failure:
+ 	return -ENOBUFS;
+ }
+-COMMAND(set, txpower, "<auto|fixed|limit> [<tx power in mBm>]",
++COMMAND(set, txpower, "[radio <radio_idx>] <auto|fixed|limit> [<tx power in mBm>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_txpower,
+ 	"Specify transmit power level and setting type.");
+ COMMAND(set, txpower, "[-l] <link id> <auto|fixed|limit> [<tx power in mBm>]",
+-- 
+2.34.1
+
