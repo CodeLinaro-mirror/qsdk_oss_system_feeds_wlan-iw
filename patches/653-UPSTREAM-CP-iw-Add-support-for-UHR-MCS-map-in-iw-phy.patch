@@ -1,0 +1,231 @@
+From 9c29f2faaec2ef53cf51a1249c584f1026954890 Mon Sep 17 00:00:00 2001
+From: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+Date: Wed, 20 May 2026 14:32:00 +0530
+Subject: [PATCH] UPSTREAM:CP:iw: Add support for UHR MCS map in iw phy output
+
+Add support for the UHR MCS map in "iw phy" output. The UHR MCS map
+is derived from EHT MCS map, with additional support for MCS 17, 19,
+20 and 23. This follows Draft P802.11bn_D1.4 section 9.4.2.324.4.
+
+Sample Output:
+
+> iw phy
+
+...
+
+UHR-MCS Map (BW <= 80) (0x444444):
+        Rx Max NSS for MCS 0-9,17,19,20,23: 4
+        Tx Max NSS for MCS 0-9,17,19,20,23: 4
+        Rx Max NSS for MCS 10-11: 4
+        Tx Max NSS for MCS 10-11: 4
+        Rx Max NSS for MCS 12-13: 4
+        Tx Max NSS for MCS 12-13: 4
+UHR-MCS Map (BW = 160) (0x444444):
+        Rx Max NSS for MCS 0-9,17,19,20,23: 4
+        Tx Max NSS for MCS 0-9,17,19,20,23: 4
+        Rx Max NSS for MCS 10-11: 4
+        Tx Max NSS for MCS 10-11: 4
+        Rx Max NSS for MCS 12-13: 4
+        Tx Max NSS for MCS 12-13: 4
+UHR-MCS Map (BW = 320) (0x444444):
+        Rx Max NSS for MCS 0-9,17,19,20,23: 4
+        Tx Max NSS for MCS 0-9,17,19,20,23: 4
+        Rx Max NSS for MCS 10-11: 4
+        Tx Max NSS for MCS 10-11: 4
+        Rx Max NSS for MCS 12-13: 4
+        Tx Max NSS for MCS 12-13: 4
+...
+
+Patch-dependency: None
+
+Signed-off-by: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+---
+ info.c |  2 +-
+ iw.h   |  2 +-
+ util.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++++---------
+ 3 files changed, 64 insertions(+), 13 deletions(-)
+
+diff --git a/info.c b/info.c
+index 04c9e63..79eb077 100644
+--- a/info.c
++++ b/info.c
+@@ -493,7 +493,7 @@ static int print_phy_handler(struct nl_msg *msg, void *arg)
+ 						    rem_band) {
+ 					print_he_info(nl_iftype);
+ 					print_eht_info(nl_iftype, last_band);
+-					print_uhr_info(nl_iftype);
++					print_uhr_info(nl_iftype, last_band);
+ 				}
+ 			}
+ 			if (tb_band[NL80211_BAND_ATTR_FREQS]) {
+diff --git a/iw.h b/iw.h
+index a4d7468..dd4858e 100644
+--- a/iw.h
++++ b/iw.h
+@@ -472,7 +472,7 @@ void print_eht_capability(const uint8_t *ie, int len, const uint8_t *he_cap,
+ 			  bool from_ap);
+ void print_eht_operation(const uint8_t *ie, int len);
+ void print_eht_info(struct nlattr *nl_iftype, int band);
+-void print_uhr_info(struct nlattr *nl_iftype);
++void print_uhr_info(struct nlattr *nl_iftype, int band);
+ void print_s1g_capability(const uint8_t *caps);
+ 
+ char *channel_width_name(enum nl80211_chan_width width);
+diff --git a/util.c b/util.c
+index 7c3f120..837e342 100644
+--- a/util.c
++++ b/util.c
+@@ -1538,16 +1538,22 @@ static void __print_supported_mcs_nss_set(int band,
+ 					  const __u8 *eht_phy_cap,
+ 					  const __u8 *eht_mcs_set, size_t eht_mcs_len,
+ 					  const __u16 *he_phy_cap,
++					  bool is_uhr,
+ 					  bool from_ap,
+ 					  bool indent)
+ {
+ 	unsigned int i;
+ 	const char *pre = indent ? "\t" : "";
++	const char *mode[] = {"EHT", "UHR"};
++	int idx = is_uhr ? 1 : 0;
+ 
+ 	if (!from_ap &&
+ 	    !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8))) {
+-		static const char * const mcs[] = { "0-7", "8-9", "10-11", "12-13" };
+-		printf("%s\t\tEHT-MCS Map (20 Mhz Non-AP STA) (0x", pre);
++		static const char * const eht_mcs[] = { "0-7", "8-9", "10-11", "12-13" };
++		static const char * const uhr_mcs[] = { "0-7,17,19,20", "8-9,23", "10-11", "12-13" };
++		const char * const *mcs = is_uhr ? uhr_mcs : eht_mcs;
++
++		printf("%s\t\t%s-MCS Map (20 Mhz Non-AP STA) (0x", pre, mode[idx]);
+ 		for (i = 0; i < eht_mcs_len; i++)
+ 			printf("%02x", ((__u8 *)eht_mcs_set)[i]);
+ 		printf("):\n");
+@@ -1559,7 +1565,9 @@ static void __print_supported_mcs_nss_set(int band,
+ 			       pre, mcs[i], eht_mcs_set[i] >> 4);
+ 		}
+ 	} else {
+-		static const char * const mcs[] = { "0-9", "10-11", "12-13"};
++		static const char * const eht_mcs[] = { "0-9", "10-11", "12-13"};
++		static const char * const uhr_mcs[] = { "0-9,17,19,20,23", "10-11", "12-13"};
++		const char * const *mcs = is_uhr ? uhr_mcs : eht_mcs;
+ 
+ 		/* Bit 1 corresponds to 2.4Ghz 40Mhz support
+ 		 * Bit 2 corresponds to 5/6Ghz 40 and 80Mhz support
+@@ -1568,7 +1576,7 @@ static void __print_supported_mcs_nss_set(int band,
+ 		 */
+ 		if (he_phy_cap[0] & ((BIT(1) | BIT(2)) << 8) ||
+ 		    (from_ap && !(he_phy_cap[0] & ((BIT(1) | BIT(2) | BIT(3) | BIT(4)) << 8)))) {
+-			printf("%s\t\tEHT-MCS Map (BW <= 80) (0x", pre);
++			printf("%s\t\t%s-MCS Map (BW <= 80) (0x", pre, mode[idx]);
+ 			for (i = 0; i < 3; i++)
+ 				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
+ 			printf("):\n");
+@@ -1583,7 +1591,7 @@ static void __print_supported_mcs_nss_set(int band,
+ 		eht_mcs_set += 3;
+ 
+ 		if (he_phy_cap[0] & (BIT(3) << 8)) {
+-			printf("%s\t\tEHT-MCS Map (BW = 160) (0x", pre);
++			printf("%s\t\t%s-MCS Map (BW = 160) (0x", pre, mode[idx]);
+ 			for (i = 0; i < 3; i++)
+ 				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
+ 			printf("):\n");
+@@ -1598,7 +1606,7 @@ static void __print_supported_mcs_nss_set(int band,
+ 
+ 		eht_mcs_set += 3;
+ 		if (band == NL80211_BAND_6GHZ && (eht_phy_cap[0] & BIT(1))) {
+-			printf("%s\t\tEHT-MCS Map (BW = 320) (0x", pre);
++			printf("%s\t\t%s-MCS Map (BW = 320) (0x", pre, is_uhr ? "UHR" : "EHT");
+ 			for (i = 0; i < 3; i++)
+ 				printf("%02x", ((__u8 *)eht_mcs_set)[i]);
+ 			printf("):\n");
+@@ -1713,7 +1721,7 @@ static void __print_eht_capa(int band,
+ 	PRINT_EHT_PHY_CAP(2, 0, "Rx 1024-QAM In Wider Bandwidth DL OFDMA Supported");
+ 	PRINT_EHT_PHY_CAP(2, 1, "Rx 4096-QAM In Wider Bandwidth DL OFDMA Supported");
+ 
+-	__print_supported_mcs_nss_set(band, phy_cap, mcs_set, mcs_len, he_phy_cap, from_ap, indent);
++	__print_supported_mcs_nss_set(band, phy_cap, mcs_set, mcs_len, he_phy_cap, false, from_ap, indent);
+ 
+ 	if (ppet && ppet_len && (phy_cap[1] & BIT(11))) {
+ 		printf("%s\t\tEHT PPE Thresholds ", pre);
+@@ -1823,8 +1831,13 @@ void print_eht_capability(const uint8_t *ie, int len, const uint8_t *he_cap,
+ 			 NULL, 0, he_phy_cap - 1, from_ap, false);
+ }
+ 
+-static void __print_uhr_capa(const __u64 mac_cap,
++static void __print_uhr_capa(int band,
++			     const __u64 mac_cap,
+ 			     const __u64 phy_cap,
++			     const __u8 *eht_phy_cap,
++			     const __u8 *eht_mcs_set, size_t eht_mcs_len,
++			     const __u16 *he_phy_cap,
++			     bool from_ap,
+ 			     bool indent)
+ {
+ 	const char *pre = indent ? "\t" : "";
+@@ -1915,14 +1928,19 @@ static void __print_uhr_capa(const __u64 mac_cap,
+ 	PRINT_UHR_PHY_CAP(29, "DRU DBW=40 in PBW≥80 MHz Supported");
+ 	PRINT_UHR_PHY_CAP(30, "DRU DBW=60 in PBW≥80 MHz Supported");
+ 	PRINT_UHR_PHY_CAP(31, "DRU+RRU Hybrid mode Supported");
++
++	__print_supported_mcs_nss_set(band, eht_phy_cap, eht_mcs_set, eht_mcs_len, he_phy_cap, true, from_ap, indent);
+ }
+ 
+-void print_uhr_info(struct nlattr *nl_iftype)
++void print_uhr_info(struct nlattr *nl_iftype, int band)
+ {
+ 	struct nlattr *tb[NL80211_BAND_IFTYPE_ATTR_MAX + 1];
+ 	__u64 mac_cap = 0;
+ 	__u64 phy_cap = 0;
+-	size_t len;
++	__u8 eht_phy_cap[9] = { 0 };
++	__u8 eht_mcs_set[13] = { 0 };
++	__u16 he_phy_cap[6] = { 0 };
++	size_t len, eht_mcs_len = 0;
+ 
+ 	nla_parse(tb, NL80211_BAND_IFTYPE_ATTR_MAX,
+ 		  nla_data(nl_iftype), nla_len(nl_iftype), NULL);
+@@ -1955,7 +1973,40 @@ void print_uhr_info(struct nlattr *nl_iftype)
+ 		       len);
+ 	}
+ 
+-	__print_uhr_capa(mac_cap, phy_cap, true);
++	if (tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY]) {
++		len = nla_len(tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY]);
++
++		if (len > sizeof(eht_phy_cap))
++			len = sizeof(eht_phy_cap);
++
++		memcpy(eht_phy_cap,
++		       nla_data(tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_PHY]),
++		       len);
++	}
++
++	if (tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_MCS_SET]) {
++		len = nla_len(tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_MCS_SET]);
++		if (len > sizeof(eht_mcs_set))
++			len = sizeof(eht_mcs_set);
++		memcpy(eht_mcs_set,
++		       nla_data(tb[NL80211_BAND_IFTYPE_ATTR_EHT_CAP_MCS_SET]),
++		       len);
++
++		// Assume that all parts of the MCS set are present
++		eht_mcs_len = sizeof(eht_mcs_set);
++	}
++
++	if (tb[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]) {
++		len = nla_len(tb[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]);
++
++		if (len > sizeof(he_phy_cap) - 1)
++			len = sizeof(he_phy_cap) - 1;
++		memcpy(&((__u8 *)he_phy_cap)[1],
++		       nla_data(tb[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]),
++		       len);
++	}
++
++	__print_uhr_capa(band, mac_cap, phy_cap, eht_phy_cap, eht_mcs_set, eht_mcs_len, he_phy_cap, true, true);
+ }
+ 
+ void print_he_capability(const uint8_t *ie, int len)
+-- 
+2.34.1
+
