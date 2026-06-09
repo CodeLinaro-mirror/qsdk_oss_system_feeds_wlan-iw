@@ -1,0 +1,36 @@
+From 1f8b7123bf0c8cee0363aad4ea6f5f8b70dbe49a Mon Sep 17 00:00:00 2001
+From: Lokitha Thangavel <lthangav@qti.qualcomm.com>
+Date: Fri, 5 Jun 2026 11:57:28 +0530
+Subject: [PATCH] QSDK: CP: IW: Add support for dynamic chain mask change
+
+Currently, the 'iw phy <phyname> set antenna' command
+to set antenna chain mask returns error when the vaps
+are up and running. Add support to change the
+chain mask during runtime using the same command
+
+Command Usage:
+iw [options] phy <phyname> set antenna [radio <radio idx>]
+<bitmap> | all | <tx bitmap> <rx bitmap>
+
+Patch-dependency: Ib3859ec04a5 ("QSDK: CP: IW: Add support for per radio tx/rx chainmask"
+
+Signed-off-by: Lokitha Thangavel <lthangav@qti.qualcomm.com>
+---
+ phy.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/phy.c b/phy.c
+index 2e7f954..b017588 100644
+--- a/phy.c
++++ b/phy.c
+@@ -1085,6 +1085,7 @@ static int handle_antenna(struct nl80211_state *state,
+ 			return 1;
+ 
+ 		NLA_PUT_U8(msg, NL80211_ATTR_WIPHY_RADIO_INDEX, radio_id);
++		NLA_PUT_U8(msg, NL80211_ATTR_DYNAMIC_CHAIN_MASK, 1);
+ 		i = 2;
+ 	}
+ 
+-- 
+2.34.1
+
