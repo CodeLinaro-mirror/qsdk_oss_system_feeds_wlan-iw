@@ -1,0 +1,197 @@
+From dd899c83fcc0aaf87ecd8f3160117ba26cbc85fa Mon Sep 17 00:00:00 2001
+From: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+Date: Mon, 18 May 2026 12:11:25 +0530
+Subject: [PATCH] UPSTREAM:CP:iw Add support for 2xLDPC in set bitrate command
+
+Add support to enable or disable 2xLDPC via the set bitrate command.
+The command format is:
+
+iw dev <intf> set bitrates -l <link-id> 2xldpc-<2.4|5|6> on|off
+
+eg: iw dev wlan0 set bitrates -l 0 2xldpc-6 on
+
+Patch-dependency: None
+
+Signed-off-by: Suraj P Kizhakkethil <suraj.kizhakkethil@oss.qualcomm.com>
+---
+ bitrate.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++-----
+ nl80211.h | 11 +++++++++++
+ 2 files changed, 57 insertions(+), 5 deletions(-)
+
+diff --git a/bitrate.c b/bitrate.c
+index 9b80396..63951c7 100644
+--- a/bitrate.c
++++ b/bitrate.c
+@@ -393,6 +393,19 @@ static int parse_uhr_elr(char *uhr_elr)
+ 	return -1;
+ }
+ 
++static int parse_2xldpc(char *uhr_2xldpc)
++{
++	if (uhr_2xldpc == NULL)
++		return 0;
++
++	if (strcmp(uhr_2xldpc, "on") == 0)
++		return NL80211_UHR_2XLDPC_ENABLE;
++	else if (strcmp(uhr_2xldpc, "off") == 0)
++		return NL80211_UHR_2XLDPC_DISABLE;
++
++	return -1;
++}
++
+ int set_bitrates(struct nl_msg *msg,
+ 		 int argc, char **argv,
+ 		 enum nl80211_attrs attr)
+@@ -469,6 +482,9 @@ int set_bitrates(struct nl_msg *msg,
+ 	int has_uhr_elr_24 = 0, has_uhr_elr_5 = 0, has_uhr_elr_6 = 0;
+ 	char *uhr_elr_argv = NULL;
+ 	int uhr_elr = 0;
++	int has_2xldpc_24 = 0, has_2xldpc_5 = 0, has_2xldpc_6 = 0;
++	char *uhr_2xldpc_argv = NULL;
++	int uhr_2xldpc = 0;
+ 
+ 	enum {
+ 		S_NONE,
+@@ -487,6 +503,7 @@ int set_bitrates(struct nl_msg *msg,
+ 		S_UHR_GI,
+ 		S_UHR_LTF,
+ 		S_UHR_ELR,
++		S_2XLDPC,
+ 	} parser_state = S_NONE;
+ 
+ 	if (!strcmp(argv[0], "-l")) {
+@@ -703,6 +720,15 @@ int set_bitrates(struct nl_msg *msg,
+ 		} else if (strcmp(argv[i], "uhr-elr-6") == 0) {
+ 			has_uhr_elr_6 = 1;
+ 			parser_state = S_UHR_ELR;
++		} else if (strcmp(argv[i], "2xldpc-2.4") == 0) {
++			has_2xldpc_24 = 1;
++			parser_state = S_2XLDPC;
++		} else if (strcmp(argv[i], "2xldpc-5") == 0) {
++			has_2xldpc_5 = 1;
++			parser_state = S_2XLDPC;
++		} else if (strcmp(argv[i], "2xldpc-6") == 0) {
++			has_2xldpc_6 = 1;
++			parser_state = S_2XLDPC;
+ 		} else switch (parser_state) {
+ 		case S_LEGACY:
+ 			tmpd = strtod(argv[i], &end);
+@@ -783,6 +809,9 @@ int set_bitrates(struct nl_msg *msg,
+ 		case S_UHR_ELR:
+ 			uhr_elr_argv = argv[i];
+ 			break;
++		case S_2XLDPC:
++			uhr_2xldpc_argv = argv[i];
++			break;
+ 		default:
+ 			if (attr != NL80211_ATTR_TX_RATES)
+ 				goto next;
+@@ -879,6 +908,12 @@ next:
+ 			return 1;
+ 	}
+ 
++	if (uhr_2xldpc_argv) {
++		uhr_2xldpc = parse_2xldpc(uhr_2xldpc_argv);
++		if (uhr_2xldpc < 0)
++			return 1;
++	}
++
+ 	nl_rates = nla_nest_start(msg, attr | NLA_F_NESTED);
+ 	if (!nl_rates)
+ 		goto nla_put_failure;
+@@ -887,7 +922,7 @@ next:
+ 	    sgi_24 || lgi_24 || has_he_gi_24 || has_he_ltf_24 || have_he_ul_mcs_24 ||
+ 	    have_eht_mcs_24 || has_eht_gi_24 || has_eht_ltf_24 ||
+ 	    have_uhr_mcs_24 || has_uhr_gi_24 || has_uhr_ltf_24 ||
+-	    has_uhr_elr_24) {
++	    has_uhr_elr_24 || has_2xldpc_24) {
+ 		nl_band = nla_nest_start(msg, NL80211_BAND_2GHZ);
+ 		if (!nl_band)
+ 			goto nla_put_failure;
+@@ -931,6 +966,8 @@ next:
+                                 &txrate_he_ul_24);
+ 		if (has_uhr_elr_24)
+ 			nla_put_u8(msg, NL80211_TXRATE_UHR_ELR, uhr_elr);
++		if (has_2xldpc_24)
++			nla_put_u8(msg, NL80211_TXRATE_UHR_2XLDPC, uhr_2xldpc);
+ 		nla_nest_end(msg, nl_band);
+ 	}
+ 
+@@ -938,7 +975,7 @@ next:
+ 	    sgi_5 || lgi_5 || has_he_gi_5 || has_he_ltf_5 || have_he_ul_mcs_5 ||
+ 	    have_eht_mcs_5 || has_eht_gi_5 || has_eht_ltf_5 ||
+ 	    have_uhr_mcs_5 || has_uhr_gi_5 || has_uhr_ltf_5 ||
+-	    has_uhr_elr_5) {
++	    has_uhr_elr_5 || has_2xldpc_5) {
+ 		nl_band = nla_nest_start(msg, NL80211_BAND_5GHZ);
+ 		if (!nl_band)
+ 			goto nla_put_failure;
+@@ -982,12 +1019,14 @@ next:
+                                 &txrate_he_ul_5);
+ 		if (has_uhr_elr_5)
+ 			nla_put_u8(msg, NL80211_TXRATE_UHR_ELR, uhr_elr);
++		if (has_2xldpc_5)
++			nla_put_u8(msg, NL80211_TXRATE_UHR_2XLDPC, uhr_2xldpc);
+ 		nla_nest_end(msg, nl_band);
+ 	}
+ 
+ 	if (have_he_mcs_6 || has_he_gi_6 || has_he_ltf_6 || have_eht_mcs_6 ||
+ 	    has_eht_gi_6 || has_eht_ltf_6 || have_uhr_mcs_6 || has_uhr_gi_6 ||
+-	    has_uhr_ltf_6 || has_uhr_elr_6) {
++	    has_uhr_ltf_6 || has_uhr_elr_6 || has_2xldpc_6) {
+ 		nl_band = nla_nest_start(msg, NL80211_BAND_6GHZ);
+ 		if (!nl_band)
+ 			goto nla_put_failure;
+@@ -1018,6 +1057,8 @@ next:
+ 			nla_put_u8(msg, NL80211_TXRATE_UHR_LTF, uhr_ltf);
+ 		if (has_uhr_elr_6)
+ 			nla_put_u8(msg, NL80211_TXRATE_UHR_ELR, uhr_elr);
++		if (has_2xldpc_6)
++			nla_put_u8(msg, NL80211_TXRATE_UHR_2XLDPC, uhr_2xldpc);
+ 		nla_nest_end(msg, nl_band);
+ 	}
+ 
+@@ -1037,9 +1078,9 @@ static int handle_bitrates(struct nl80211_state *state,
+ }
+ 
+ #define DESCR_LEGACY "[legacy-<2.4|5> <legacy rate in Mbps>*]"
+-#define DESCR DESCR_LEGACY " [ht-mcs-<2.4|5> <MCS index>*] [vht-mcs-<2.4|5>  [he-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [sgi-2.4|lgi-2.4] [sgi-5|lgi-5] [he-ul-mcs-<2.4|5> <NSS:MCS>] [eht-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [eht-gi-<2.4|5|6> <0.8|1.6|3.2>] [eht-ltf-<2.4|5|6> <1|2|4>] [uhr-mcs-<2.4|5|6> <NSS:MCSx,MCSy...[:UEQM_Px,UEQM_Py...|:UEQM_Px-UEQM_Py] | NSS:MCSx-MCSy[:UEQM_Px,UEQM_Py...|:UEQM_Px-UEQM_Py]>*] [uhr-gi-<2.4|5|6> <0.8|1.6|3.2>] [uhr-ltf-<2.4|5|6> <1|2|4>] [uhr-elr-<2.4|5|6> on|off]"
++#define DESCR DESCR_LEGACY " [ht-mcs-<2.4|5> <MCS index>*] [vht-mcs-<2.4|5>  [he-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [sgi-2.4|lgi-2.4] [sgi-5|lgi-5] [he-ul-mcs-<2.4|5> <NSS:MCS>] [eht-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [eht-gi-<2.4|5|6> <0.8|1.6|3.2>] [eht-ltf-<2.4|5|6> <1|2|4>] [uhr-mcs-<2.4|5|6> <NSS:MCSx,MCSy...[:UEQM_Px,UEQM_Py...|:UEQM_Px-UEQM_Py] | NSS:MCSx-MCSy[:UEQM_Px,UEQM_Py...|:UEQM_Px-UEQM_Py]>*] [uhr-gi-<2.4|5|6> <0.8|1.6|3.2>] [uhr-ltf-<2.4|5|6> <1|2|4>] [uhr-elr-<2.4|5|6> on|off] [2xldpc-<2.4|5|6> on|off]"
+ 
+-COMMAND(set, bitrates, "[legacy-<2.4|5> <legacy rate in Mbps>*] [ht-mcs-<2.4|5> <MCS index>*] [vht-mcs-<2.4|5> [he-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [sgi-2.4|lgi-2.4] [sgi-5|lgi-5] [he-gi-<2.4|5|6> <0.8|1.6|3.2>] [he-ltf-<2.4|5|6> <1|2|4>] [he-ul-mcs-<2.4|5> <NSS:MCS>] [eht-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [eht-gi-<2.4|5|6> <0.8|1.6|3.2>] [eht-ltf-<2.4|5|6> <1|2|4>] [uhr-mcs-<2.4|5|6> <NSS:MCSx[:UEQMPx],MCSy[:UEQMPy]... | NSS:MCSx-MCSy[:UEQMP]>*] [uhr-gi-<2.4|5|6> <0.8|1.6|3.2>] [uhr-ltf-<2.4|5|6> <1|2|4>] [uhr-elr-<2.4|5|6> on|off]",
++COMMAND(set, bitrates, "[legacy-<2.4|5> <legacy rate in Mbps>*] [ht-mcs-<2.4|5> <MCS index>*] [vht-mcs-<2.4|5> [he-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [sgi-2.4|lgi-2.4] [sgi-5|lgi-5] [he-gi-<2.4|5|6> <0.8|1.6|3.2>] [he-ltf-<2.4|5|6> <1|2|4>] [he-ul-mcs-<2.4|5> <NSS:MCS>] [eht-mcs-<2.4|5|6> <NSS:MCSx,MCSy... | NSS:MCSx-MCSy>*] [eht-gi-<2.4|5|6> <0.8|1.6|3.2>] [eht-ltf-<2.4|5|6> <1|2|4>] [uhr-mcs-<2.4|5|6> <NSS:MCSx[:UEQMPx],MCSy[:UEQMPy]... | NSS:MCSx-MCSy[:UEQMP]>*] [uhr-gi-<2.4|5|6> <0.8|1.6|3.2>] [uhr-ltf-<2.4|5|6> <1|2|4>] [uhr-elr-<2.4|5|6> on|off] [2xldpc-<2.4|5|6> on|off]",
+ 	NL80211_CMD_SET_TX_BITRATE_MASK, 0, CIB_NETDEV, handle_bitrates,
+ 	"Sets up the specified rate masks.\n"
+ 	"Not passing any arguments would clear the existing mask (if any).");
+diff --git a/nl80211.h b/nl80211.h
+index 7b0bdce..5b23b4e 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -3954,6 +3954,16 @@ enum nl80211_uhr_elr_config {
+         NL80211_UHR_ELR_ENABLE,
+ };
+ 
++/**
++ * enum nl80211_uhr_2xldpc - 2xldpc enable or disable
++ * @NL80211_UHR_2XLDPC_DISABLE: 0 - 2xLDPC Disable
++ * @NL80211_UHR_2XLDPC_ENABLE:  1 - 2xLDPC Enable
++ */
++enum nl80211_uhr_2xldpc {
++        NL80211_UHR_2XLDPC_DISABLE,
++        NL80211_UHR_2XLDPC_ENABLE,
++};
++
+ /**
+  * enum nl80211_eht_ru_alloc - EHT RU allocation values
+  * @NL80211_RATE_INFO_EHT_RU_ALLOC_26: 26-tone RU allocation
+@@ -5799,6 +5809,7 @@ enum nl80211_tx_rate_attributes {
+ 	NL80211_TXRATE_UHR_LTF,
+ 	NL80211_TXRATE_UHR_UEQM_P,
+ 	NL80211_TXRATE_UHR_ELR,
++	NL80211_TXRATE_UHR_2XLDPC,
+ 
+ 	/* keep last */
+ 	__NL80211_TXRATE_AFTER_LAST,
+-- 
+2.34.1
+

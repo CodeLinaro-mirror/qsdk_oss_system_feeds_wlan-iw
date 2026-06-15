@@ -1,0 +1,29 @@
+From 874cfdd98003f849d566315971da918bbfe20e35 Mon Sep 17 00:00:00 2001
+From: Abhinav Raghunandan <abhiragh@qti.qualcomm.com>
+Date: Thu, 26 Mar 2026 13:31:14 +0530
+Subject: [PATCH] Add validation to check valid scan radio command for BW >
+ 20MHz
+
+Signed-off-by: Abhinav Raghunandan <abhiragh@qti.qualcomm.com>
+---
+ ap.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/ap.c b/ap.c
+index b2adfb9..8b5ca26 100644
+--- a/ap.c
++++ b/ap.c
+@@ -37,6 +37,10 @@ static int handle_start_ap(struct nl80211_state *state,
+ 	if (res)
+ 		return res;
+ 
++	/* Validate for beacon interval and DTIM period */
++	if (argc < 2)
++		return -EINVAL;
++
+ 	/* beacon interval */
+ 	val = strtoul(argv[0], &end, 10);
+ 	if (*end != '\0')
+-- 
+2.34.1
+
