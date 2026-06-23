@@ -173,7 +173,7 @@ index 34d19d1..313eefd 100644
  		max_mcs = 15;
  		max_nss = NL80211_EHT_NSS_MAX;
  	} else if (mode == NL80211_TXRATE_HE) {
-@@ -40,12 +146,34 @@ static int parse_rate_chunk(const char *arg, __u8 *nss, __u16 *mcs, unsigned int
+@@ -40,12 +146,34 @@ static int parse_rate_chunk(const char *
  			return 0;
  
  		*nss = inss;
@@ -210,7 +210,7 @@ index 34d19d1..313eefd 100644
  			count = sscanf(arg, "%u:%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u",
  				       &inss, &tab[0], &tab[1], &tab[2], &tab[3],
  				       &tab[4], &tab[5], &tab[6], &tab[7], &tab[8],
-@@ -69,35 +197,44 @@ static int parse_rate_chunk(const char *arg, __u8 *nss, __u16 *mcs, unsigned int
+@@ -69,35 +197,44 @@ static int parse_rate_chunk(const char *
  
  		*nss = inss;
  		for (i = 0; i < count - 1; i++) {
@@ -264,7 +264,7 @@ index 34d19d1..313eefd 100644
  	int i;
  
  	memset(txrate_vht, 0, sizeof(*txrate_vht));
-@@ -107,7 +244,7 @@ static int setup_vht(struct nl80211_txrate_vht *txrate_vht,
+@@ -107,7 +244,7 @@ static int setup_vht(struct nl80211_txra
  			return 0;
  
  		nss--;
@@ -273,7 +273,7 @@ index 34d19d1..313eefd 100644
  	}
  
  	return 1;
-@@ -117,7 +254,7 @@ static int setup_he(struct nl80211_txrate_he *txrate_he,
+@@ -117,7 +254,7 @@ static int setup_he(struct nl80211_txrat
  		    int argc, char **argv)
  {
  	__u8 nss;
@@ -282,7 +282,7 @@ index 34d19d1..313eefd 100644
  	int i;
  
  	memset(txrate_he, 0, sizeof(*txrate_he));
-@@ -127,7 +264,7 @@ static int setup_he(struct nl80211_txrate_he *txrate_he,
+@@ -127,7 +264,7 @@ static int setup_he(struct nl80211_txrat
  			return 0;
  
  		nss--;
@@ -291,7 +291,7 @@ index 34d19d1..313eefd 100644
  	}
  
  	return 1;
-@@ -137,7 +274,7 @@ static int setup_eht(struct nl80211_txrate_eht *txrate_eht,
+@@ -137,7 +274,7 @@ static int setup_eht(struct nl80211_txra
  		    int argc, char **argv)
  {
  	__u8 nss;
@@ -300,7 +300,7 @@ index 34d19d1..313eefd 100644
  	int i;
  
  	memset(txrate_eht, 0, sizeof(*txrate_eht));
-@@ -147,7 +284,38 @@ static int setup_eht(struct nl80211_txrate_eht *txrate_eht,
+@@ -147,7 +284,38 @@ static int setup_eht(struct nl80211_txra
  			return 0;
  
  		nss--;
@@ -436,21 +436,21 @@ index 34d19d1..313eefd 100644
  			eht_argc = &eht_argc_6;
  			have_eht_mcs_6 = true;
 +		} else if (strcmp(argv[i], "uhr-mcs-2.4") == 0) {
-+			if (have_uhr_mcs_24 || have_eht_mcs_24)
++			if (have_uhr_mcs_24)
 +				return 1;
 +			parser_state = S_UHR;
 +			uhr_argv = uhr_argv_24;
 +			uhr_argc = &uhr_argc_24;
 +			have_uhr_mcs_24 = true;
 +		} else if (strcmp(argv[i], "uhr-mcs-5") == 0) {
-+			if (have_uhr_mcs_5 || have_eht_mcs_5)
++			if (have_uhr_mcs_5)
 +				return 1;
 +			parser_state = S_UHR;
 +			uhr_argv = uhr_argv_5;
 +			uhr_argc = &uhr_argc_5;
 +			have_uhr_mcs_5 = true;
 +		} else if (strcmp(argv[i], "uhr-mcs-6") == 0) {
-+			if (have_uhr_mcs_6 || have_eht_mcs_6)
++			if (have_uhr_mcs_6)
 +				return 1;
 +			parser_state = S_UHR;
 +			uhr_argv = uhr_argv_6;
@@ -638,7 +638,7 @@ index 34d19d1..313eefd 100644
  		nla_nest_end(msg, nl_band);
  	}
  
-@@ -676,9 +993,9 @@ static int handle_bitrates(struct nl80211_state *state,
+@@ -676,9 +993,9 @@ static int handle_bitrates(struct nl8021
  }
  
  #define DESCR_LEGACY "[legacy-<2.4|5> <legacy rate in Mbps>*]"
@@ -654,11 +654,10 @@ diff --git a/nl80211.h b/nl80211.h
 index 62c1b2d..b6b892f 100644
 --- a/nl80211.h
 +++ b/nl80211.h
-@@ -3914,6 +3914,30 @@ enum nl80211_eht_ltf {
- 	NL80211_RATE_INFO_EHT_4XLTF,
+@@ -3876,6 +3876,30 @@ enum nl80211_eht_ltf {
  };
  
-+/**
+ /**
 + * enum nl80211_uhr_gi - UHR guard interval
 + * @NL80211_RATE_INFO_UHR_GI_0_8: 0.8 usec
 + * @NL80211_RATE_INFO_UHR_GI_1_6: 1.6 usec
@@ -682,10 +681,11 @@ index 62c1b2d..b6b892f 100644
 +	NL80211_RATE_INFO_UHR_4XLTF,
 +};
 +
- /**
++/**
   * enum nl80211_eht_ru_alloc - EHT RU allocation values
   * @NL80211_RATE_INFO_EHT_RU_ALLOC_26: 26-tone RU allocation
-@@ -5726,6 +5750,11 @@ enum nl80211_key_attributes {
+  * @NL80211_RATE_INFO_EHT_RU_ALLOC_52: 52-tone RU allocation
+@@ -5687,6 +5711,11 @@ enum nl80211_key_attributes {
   * 	see &struct nl80211_txrate_eht
   * @NL80211_TXRATE_EHT_GI: configure EHT GI, 0.8us, 1.6us and 3.2us.
   * @NL80211_TXRATE_EHT_LTF: configure EHT LTF, 1XLTF, 2XLTF and 4XLTF.
@@ -697,7 +697,7 @@ index 62c1b2d..b6b892f 100644
   * @__NL80211_TXRATE_AFTER_LAST: internal
   * @NL80211_TXRATE_MAX: highest TX rate attribute
   */
-@@ -5742,6 +5771,10 @@ enum nl80211_tx_rate_attributes {
+@@ -5703,6 +5732,10 @@ enum nl80211_tx_rate_attributes {
  	NL80211_TXRATE_EHT,
  	NL80211_TXRATE_EHT_GI,
  	NL80211_TXRATE_EHT_LTF,
@@ -708,7 +708,7 @@ index 62c1b2d..b6b892f 100644
  
  	/* keep last */
  	__NL80211_TXRATE_AFTER_LAST,
-@@ -5761,6 +5794,7 @@ struct nl80211_txrate_vht {
+@@ -5722,6 +5755,7 @@ struct nl80211_txrate_vht {
  
  #define NL80211_HE_NSS_MAX		8
  #define NL80211_EHT_NSS_MAX             16
@@ -716,11 +716,10 @@ index 62c1b2d..b6b892f 100644
  /**
   * struct nl80211_txrate_he - HE MCS/NSS txrate bitmap
   * @mcs: MCS bitmap table for each NSS (array index 0 for 1 stream, etc.)
-@@ -5783,6 +5817,25 @@ struct nl80211_txrate_eht {
- 	__u16 mcs[NL80211_EHT_NSS_MAX];
+@@ -5745,6 +5779,25 @@ struct nl80211_txrate_eht {
  };
  
-+/**
+ /**
 + * struct nl80211_txrate_uhr - UHR MCS/NSS txrate bitmap
 + * @mcs: MCS bitmap table for each NSS (array index 0 for 1 stream, etc.)
 + */
@@ -739,9 +738,7 @@ index 62c1b2d..b6b892f 100644
 +	__u8 pattern[NL80211_UHR_UEQM_NSS_COUNT][NL80211_UHR_UEQM_MCS_COL_COUNT];
 +};
 +
- /**
++/**
   * enum nl80211_band - Frequency band
   * @NL80211_BAND_2GHZ: 2.4 GHz ISM band
--- 
-2.34.1
-
+  * @NL80211_BAND_5GHZ: around 5 GHz band (4.9 - 5.7 GHz)
