@@ -1,0 +1,49 @@
+From daaa20c69ccbc163cae9464f20407db626241c7d Mon Sep 17 00:00:00 2001
+From: Divya R <divraj@qti.qualcomm.com>
+Date: Fri, 12 Jun 2026 12:24:55 +0530
+Subject: [PATCH] Add support to display Nol history attribute
+
+Add support to display Nol history attribute in iw command "phyX channels"
+Rearrange the NL order NL80211_FREQUENCY_ATTR_NOL_HISTORY
+to sync userspace and kernel NL copies
+
+Patch-dependency:I29f5ae98cd(UPSTREAM:PROTOCOL:iw: add sta_dfs_en support
+command for ETSI DFS domain)
+
+Signed-off-by: Divya R <divraj@qti.qualcomm.com>
+
+diff --git a/nl80211.h b/nl80211.h
+index 25eda6d..b832796 100644
+--- a/nl80211.h
++++ b/nl80211.h
+@@ -4721,8 +4721,12 @@ enum nl80211_frequency_attr {
+ 	NL80211_FREQUENCY_ATTR_CAN_MONITOR,
+ 	NL80211_FREQUENCY_ATTR_ALLOW_6GHZ_VLP_AP,
+ 	NL80211_FREQUENCY_ATTR_ALLOW_20MHZ_ACTIVITY,
+-	NL80211_FREQUENCY_ATTR_6GHZ_SUPP_PWR_MODES,
+-	NL80211_FREQUENCY_ATTR_6GHZ_TXPOWERS,
++	NL80211_FREQUENCY_ATTR_NO_UHR,
++	/* QSDK-only unapproved attrs are offset by +10 to avoid upstream ID collision */
++	NL80211_FREQUENCY_ATTR_6GHZ_SUPP_PWR_MODES = 52,
++	NL80211_FREQUENCY_ATTR_6GHZ_TXPOWERS = 53,
++	NL80211_FREQUENCY_ATTR_NOL_HISTORY = 54,
++
+ 
+ 	/* keep last */
+ 	__NL80211_FREQUENCY_ATTR_AFTER_LAST,
+diff --git a/phy.c b/phy.c
+index 95d03f5..9fe6472 100644
+--- a/phy.c
++++ b/phy.c
+@@ -269,6 +269,8 @@ static int print_channels_handler(struct nl_msg *msg, void *arg)
+ 						if (tb_freq[NL80211_FREQUENCY_ATTR_DFS_CAC_TIME])
+ 							printf("\t  DFS CAC time: %u ms\n",
+ 							       nla_get_u32(tb_freq[NL80211_FREQUENCY_ATTR_DFS_CAC_TIME]));
++						if (tb_freq[NL80211_FREQUENCY_ATTR_NOL_HISTORY])
++							printf("\t  NOL History Enabled\n");
+ 						printf("\n");
+ 					}
+ 
+-- 
+2.34.1
+
