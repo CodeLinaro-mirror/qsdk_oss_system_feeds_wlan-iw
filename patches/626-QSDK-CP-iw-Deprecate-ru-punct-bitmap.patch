@@ -156,7 +156,7 @@ index 89beb2c..15f986f 100644
 -		NLA_PUT_U16(msg, NL80211_ATTR_RU_PUNCT_BITMAP,
 -			    chandef->ru_punct_bmap);
 +	if (chandef->punctured)
-+		NLA_PUT_U16(msg, NL80211_ATTR_PUNCT_BITMAP,
++		NLA_PUT_U32(msg, NL80211_ATTR_PUNCT_BITMAP,
 +			    chandef->punctured);
  
  	return 0;
