@@ -1,0 +1,204 @@
+From a98ed37764045d8a0ae5d0248bc865f547840751 Mon Sep 17 00:00:00 2001
+From: Vinay Adella <vadella@qti.qualcomm.com>
+Date: Thu, 2 Jul 2026 12:45:41 +0530
+Subject: [PATCH] iw: auto resolve HT40 bandwidth to HT40+ HT40- based on
+ channel
+
+Signed-off-by: Vinay Adella <vadella@qti.qualcomm.com>
+---
+ interface.c |  4 ++--
+ phy.c       | 28 ++++++++++++++--------------
+ util.c      | 48 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 62 insertions(+), 18 deletions(-)
+
+diff --git a/interface.c b/interface.c
+index 240d938..842e205 100644
+--- a/interface.c
++++ b/interface.c
+@@ -795,11 +795,11 @@ static int handle_chan(struct nl80211_state *state, struct nl_msg *msg,
+ #ifdef IW_FULL
+ SECTION(switch);
+ COMMAND(switch, freq,
+-	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|320MHz] [punct <bitmap>] [beacons <count>] [block-tx]\n"
++	"<freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|320MHz] [punct <bitmap>] [beacons <count>] [block-tx]\n"
+ 	"<control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]] [punct <bitmap>] [beacons <count>] [block-tx]",
+ 	NL80211_CMD_CHANNEL_SWITCH, 0, CIB_NETDEV, handle_freq,
+ 	"Switch the operating channel by sending a channel switch announcement (CSA).");
+-COMMAND(switch, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|320MHz] [punct <bitmap>] [beacons <count>] [block-tx]",
++COMMAND(switch, channel, "<channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|320MHz] [punct <bitmap>] [beacons <count>] [block-tx]",
+ 	NL80211_CMD_CHANNEL_SWITCH, 0, CIB_NETDEV, handle_chan,
+ 	"Switch the operating channel by sending a channel switch announcement (CSA)."
+ 	"6GHz channels expects '6G' in argument. Defaults to 5GHz or 2GHz channels");
+diff --git a/phy.c b/phy.c
+index 9fe6472..be42c13 100644
+--- a/phy.c
++++ b/phy.c
+@@ -351,13 +351,13 @@ static int handle_freq(struct nl80211_state *state, struct nl_msg *msg,
+ }
+
+ COMMAND(set, freq,
+-	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
++	"<freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
+ 	"<control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]] [punct <bitmap>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_freq,
+ 	"Set frequency/channel the hardware is using, including HT\n"
+ 	"configuration.");
+ COMMAND(set, freq,
+-	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
++	"<freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
+ 	"<control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]] [punct <bitmap>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_freq, NULL);
+
+@@ -401,13 +401,13 @@ static int handle_add_freq(struct nl80211_state *state, struct nl_msg *msg,
+ }
+
+ COMMAND(add, freq,
+-	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
++	"<freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
+ 	"<control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_add_freq,
+ 	"Set frequency/channel the hardware is using, including HT\n"
+ 	"configuration.");
+ COMMAND(add, freq,
+-	"<freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
++	"<freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]\n"
+ 	"<control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_add_freq, NULL);
+
+@@ -444,9 +444,9 @@ static int handle_chan(struct nl80211_state *state, struct nl_msg *msg,
+
+ 	return put_chandef(msg, &chandef);
+ }
+-COMMAND(set, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [punct <bitmap>]",
++COMMAND(set, channel, "<channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [punct <bitmap>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_chan, NULL);
+-COMMAND(set, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [6G] [punct <bitmap>]",
++COMMAND(set, channel, "<channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [6G] [punct <bitmap>]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_chan, NULL);
+
+ static int handle_add_chan(struct nl80211_state *state, struct nl_msg *msg,
+@@ -462,9 +462,9 @@ static int handle_add_chan(struct nl80211_state *state, struct nl_msg *msg,
+
+ 	return put_chandef(msg, &chandef);
+ }
+-COMMAND(add, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]",
++COMMAND(add, channel, "<channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_PHY, handle_add_chan, NULL);
+-COMMAND(add, channel, "<channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [6G]",
++COMMAND(add, channel, "<channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz] [6G]",
+ 	NL80211_CMD_SET_WIPHY, 0, CIB_NETDEV, handle_add_chan, NULL);
+
+ static int handle_del_chan(struct nl80211_state *state, struct nl_msg *msg,
+@@ -663,21 +663,21 @@ err_out:
+ 	return err;
+ }
+ #ifdef IW_FULL
+-TOPLEVEL(cac, "channel <channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
+-	      "freq <freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
++TOPLEVEL(cac, "channel <channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
++	      "freq <freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
+ 	      "freq <control freq> [5|10|20|40|80|80+80|160] [<center1_freq> [<center2_freq>]]",
+ 	 0, 0, CIB_NETDEV, handle_cac, NULL);
+ COMMAND(cac, trigger,
+-	"[-l] <link id> channel <channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz] [bgcac]\n"
+-	"freq <frequency> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz] [bgcac]\n"
++	"[-l] <link id> channel <channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz] [bgcac]\n"
++	"freq <frequency> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz] [bgcac]\n"
+ 	"freq <frequency> [5|10|20|40|80|80+80|160] [<center1_freq> [<center2_freq>]] [bgcac]",
+ 	NL80211_CMD_RADAR_DETECT, 0, CIB_NETDEV, handle_cac_trigger,
+ 	"Start or trigger a channel availability check (CAC) looking to look for\n"
+ 	"radars on the given channel.");
+
+ COMMAND(cac, background,
+-	"channel <channel> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
+-	"freq <frequency> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
++	"channel <channel> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
++	"freq <frequency> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz]\n"
+ 	"freq <frequency> [5|10|20|40|80|80+80|160] [<center1_freq> [<center2_freq>]]",
+ 	NL80211_CMD_RADAR_DETECT, 0, CIB_NETDEV, handle_cac_background,
+ 	"Start background channel availability check (CAC) looking to look for\n"
+diff --git a/util.c b/util.c
+index 837e342..0b39d32 100644
+--- a/util.c
++++ b/util.c
+@@ -598,17 +598,52 @@ static int parse_freqs(struct chandef *chandef, int argc, char **argv,
+  * user by giving "NOHT" instead.
+  *
+  * The working specifier if chan is set are:
+- *   <channel> [6G] [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]
++ *   <channel> [6G] [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]
+  * channel number defaults to 5G or 2G band unless 6G is specified.
+  *
+  * And if frequency is set:
+- *   <freq> [NOHT|HT20|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]
++ *   <freq> [NOHT|HT20|HT40|HT40+|HT40-|5MHz|10MHz|80MHz|160MHz|320MHz]
+  *   <control freq> [5|10|20|40|80|80+80|160|320] [<center1_freq> [<center2_freq>]]
+  *
+  * If the mode/channel width is not given the NOHT is assumed.
+  *
+  * Return: Number of used arguments, zero or negative error number otherwise
+  */
++/*
++ * resolve_ht40 - Determine HT40+ or HT40- from the control frequency.
++ *
++ * For 2.4 GHz: channels 1-6 (freq <= 2437) use HT40+, channels 7-13 use HT40-.
++ * For 5 GHz / 6 GHz: the lower channel of each 40 MHz pair is HT40+, the upper
++ * is HT40-. This is determined by whether the channel index within its 40 MHz
++ * block is even (HT40+) or odd (HT40-).
++ */
++static const struct chanmode *resolve_ht40(unsigned int freq)
++{
++	static const struct chanmode ht40plus = { .name = "HT40+",
++						   .width = NL80211_CHAN_WIDTH_40,
++						   .freq1_diff = 10,
++						   .chantype = NL80211_CHAN_HT40PLUS };
++	static const struct chanmode ht40minus = { .name = "HT40-",
++						   .width = NL80211_CHAN_WIDTH_40,
++						   .freq1_diff = -10,
++						   .chantype = NL80211_CHAN_HT40MINUS };
++
++	if (freq >= 2412 && freq <= 2472) {
++		/* 2.4 GHz: ch 1-6 -> HT40+, ch 7-13 -> HT40- */
++		return (freq <= 2437) ? &ht40plus : &ht40minus;
++	} else if (freq >= 5180 && freq < 5900) {
++		/* 5 GHz: pairs are (36,40),(44,48),(52,56),(60,64),...
++		 * lower channel of each pair -> HT40+, upper -> HT40- */
++		return (((freq - 5180) / 20) % 2 == 0) ? &ht40plus : &ht40minus;
++	} else if (freq >= 5955 && freq <= 7115) {
++		/* 6 GHz: same pairing rule */
++		return (((freq - 5955) / 20) % 2 == 0) ? &ht40plus : &ht40minus;
++	}
++
++	/* Fallback: let the kernel reject it */
++	return &ht40plus;
++}
++
+ int parse_freqchan(struct chandef *chandef, bool chan, int argc, char **argv,
+ 		   int *parsed, bool freq_in_khz)
+ {
+@@ -626,6 +661,10 @@ int parse_freqchan(struct chandef *chandef, bool chan, int argc, char **argv,
+ 		  .width = NL80211_CHAN_WIDTH_40,
+ 		  .freq1_diff = -10,
+ 		  .chantype = NL80211_CHAN_HT40MINUS },
++		{ .name = "HT40",
++		  .width = NL80211_CHAN_WIDTH_40,
++		  .freq1_diff = 0,
++		  .chantype = -1 },
+ 		{ .name = "NOHT",
+ 		  .width = NL80211_CHAN_WIDTH_20_NOHT,
+ 		  .freq1_diff = 0,
+@@ -736,6 +775,11 @@ int parse_freqchan(struct chandef *chandef, bool chan, int argc, char **argv,
+
+ 	/* channel mode given, use it and return. */
+ 	if (chanmode_selected) {
++		/* Resolve plain "HT40" to HT40+ or HT40- based on channel */
++		if (chanmode_selected->freq1_diff == 0 &&
++		    chanmode_selected->width == NL80211_CHAN_WIDTH_40)
++			chanmode_selected = resolve_ht40(freq);
++
+ 		chandef->center_freq1 = get_cf1(chanmode_selected, freq);
+
+ 		/* For non-S1G frequency */
+--
+2.34.1
+
