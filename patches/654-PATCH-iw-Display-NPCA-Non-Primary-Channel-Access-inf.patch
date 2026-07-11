@@ -1,0 +1,65 @@
+From 848d1254630930cfb09295239d95754a163274bc Mon Sep 17 00:00:00 2001
+From: Venkateswara Swamy Bandaru <vbandaru@qti.qualcomm.com>
+Date: Sat, 27 Jun 2026 00:06:29 +0530
+Subject: [PATCH] [PATCH] iw: Display NPCA (Non-Primary Channel Access)
+ information
+
+Display NPCA (Non-Primary Channel Access) information in the output of
+"iw dev" for UHR mode interfaces. After the channel line, print:
+
+  npca channel <primary> (<freq> MHz), puncture bitmap <bitmap>
+
+when NL80211_ATTR_UHR_CAPABILITY is present but NPCA attributes are
+present.
+
+NPCA is only applicable in UHR mode.  The presence of
+NL80211_ATTR_UHR_CAPABILITY in the netlink response signals UHR mode.
+NL80211_ATTR_NPCA_PRIMARY_FREQ and NL80211_ATTR_NPCA_PUNCT_BITMAP carry
+the NPCA primary channel frequency and the disabled subchannel bitmap
+respectively.
+
+Sample output (MLO AP):
+
+  link 0:
+    addr 00:03:7f:12:dc:dc
+    channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+    npca channel 52 (5260 MHz), puncture bitmap 0x3
+    txpower 28.00 dBm
+
+Sample output (non-MLO STA):
+
+        channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+        txpower 28.00 dBm
+
+Patch-dependency:
+654-QSDK-PROTOCOL-iw-Add-NPCA-NL-attributes.patch
+
+Signed-off-by: Venkateswara Swamy Bandaru <vbandaru@qti.qualcomm.com>
+---
+ interface.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/interface.c b/interface.c
+index 240d938..4fa7fb0 100644
+--- a/interface.c
++++ b/interface.c
+@@ -400,6 +400,16 @@ static void print_channel_txpower(struct nlattr *tb_msg[], const char *space)
+ 		}
+ 		printf("\n");
+ 	}
++	if (tb_msg[NL80211_ATTR_NPCA_PRIMARY_FREQ]) {
++		uint32_t npca_freq = nla_get_u32(tb_msg[NL80211_ATTR_NPCA_PRIMARY_FREQ]);
++		uint32_t npca_punct = 0;
++
++		if (tb_msg[NL80211_ATTR_NPCA_PUNCT_BITMAP])
++			npca_punct = nla_get_u32(tb_msg[NL80211_ATTR_NPCA_PUNCT_BITMAP]);
++		printf("\t\t%snpca channel %d (%d MHz), puncture bitmap 0x%x\n",
++		       space, ieee80211_frequency_to_channel(npca_freq),
++		       npca_freq, npca_punct);
++	}
+ 	if (tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]) {
+ 		int32_t txp = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]);
+ 		printf("\t\t%stxpower %d.%.2d dBm\n", space,
+-- 
+2.34.1
+
