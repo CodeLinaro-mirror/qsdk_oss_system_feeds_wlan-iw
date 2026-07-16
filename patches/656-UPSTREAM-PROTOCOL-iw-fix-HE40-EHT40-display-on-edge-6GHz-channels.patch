@@ -17,7 +17,7 @@ matching the actual 40 MHz availability for these channels.
 
 Feature: REGULATORY
 
-Patch-dependency: 655-UPSTREAM-PROTOCOL-iw-fix-6GHz-iftype-data-ordering-assumption.patch
+Patch-dependency: 655-QSDK-PROTOCOL-iw-fix-6GHz-iftype-data-ordering-assumption.patch
 
 Change-Id: I4594481fix2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
 Signed-off-by: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>

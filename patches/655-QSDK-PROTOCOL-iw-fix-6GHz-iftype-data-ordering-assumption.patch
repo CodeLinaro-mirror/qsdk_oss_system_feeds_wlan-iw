@@ -1,0 +1,99 @@
+From: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+Date: Tue, 8 Jul 2026 00:00:00 +0000
+Subject: [PATCH] QSDK:PROTOCOL:iw: fix 6 GHz iftype-data ordering assumption
+
+parse_6ghz_he_eht_widths() broke after the first IFTYPE_DATA entry
+assuming one entry is enough to determine band capabilities. Drivers
+like ath12k emit STATION (enum=2) before AP (enum=3), so the original
+code always read STA capabilities when displaying 6 GHz channel widths.
+
+Fix by preferring AP entries when available: scan IFTYPE_DATA once to
+detect if an AP entry exists (iftype_data_has_ap), then on the main
+pass skip non-AP entries when prefer_ap is true. Falls back to reading
+all entries when no AP entry is present (e.g. STA-only driver).
+
+Set IW_DEBUG_6GHZ=1 to print whether each processed entry is AP or
+STA/other while validating the ordering fix.
+
+Feature: REGULATORY
+
+Patch-dependency: 647-UPSTREAM-PROTOCOL-IW-Display-HE-EHT-channel-widths-for-6GHz-band.patch
+
+Change-Id: I4594481fix1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c
+Signed-off-by: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+--- a/phy.c
++++ b/phy.c
+@@ -8,1 +8,2 @@
+ #include <time.h>
++#include <stdlib.h>
+@@ -68,19 +68,60 @@
+ 		       1.0 * nla_get_u32(tb_txpwr[NL80211_6GHZ_TXPOWER_ATTR_VLP]));
+ }
+ 
++static bool iftype_is_ap(struct nlattr *tb_iftype[])
++{
++	struct nlattr *ift;
++	int rem;
++
++	if (!tb_iftype[NL80211_BAND_IFTYPE_ATTR_IFTYPES])
++		return false;
++
++	nla_for_each_nested(ift, tb_iftype[NL80211_BAND_IFTYPE_ATTR_IFTYPES], rem) {
++		if (nla_type(ift) == NL80211_IFTYPE_AP)
++			return true;
++	}
++	return false;
++}
++
++static bool iftype_data_has_ap(struct nlattr *iftype_data)
++{
++	struct nlattr *tb_iftype[NL80211_BAND_IFTYPE_ATTR_MAX + 1];
++	struct nlattr *nl_iftype;
++	int rem;
++
++	nla_for_each_nested(nl_iftype, iftype_data, rem) {
++		nla_parse(tb_iftype, NL80211_BAND_IFTYPE_ATTR_MAX,
++			  nla_data(nl_iftype), nla_len(nl_iftype), NULL);
++		if (iftype_is_ap(tb_iftype))
++			return true;
++	}
++	return false;
++}
++
+ static void parse_6ghz_he_eht_widths(struct nlattr *iftype_data,
+ 				     struct channels_ctx *ctx)
+ {
+ 	struct nlattr *tb_iftype[NL80211_BAND_IFTYPE_ATTR_MAX + 1];
+ 	struct nlattr *nl_iftype;
+ 	bool has_eht = false;
++	bool prefer_ap;
+ 	int rem_iftype;
+ 	__u8 *phy;
+ 
++	prefer_ap = iftype_data_has_ap(iftype_data);
++
+ 	nla_for_each_nested(nl_iftype, iftype_data, rem_iftype) {
+ 		nla_parse(tb_iftype, NL80211_BAND_IFTYPE_ATTR_MAX,
+ 			  nla_data(nl_iftype), nla_len(nl_iftype), NULL);
+ 
++		if (getenv("IW_DEBUG_6GHZ"))
++			printf("6GHz IFTYPE_DATA: %s %s\n",
++			       iftype_is_ap(tb_iftype) ? "AP" : "STA/other",
++			       prefer_ap && !iftype_is_ap(tb_iftype) ?
++			       "ignored" : "used");
++
++		if (prefer_ap && !iftype_is_ap(tb_iftype))
++			continue;
+ 		if (tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY] &&
+ 		    nla_len(tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]) >= 1) {
+ 			phy = nla_data(tb_iftype[NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY]);
+@@ -109,9 +145,6 @@
+ 			if (phy[0] & 0x02)
+ 				ctx->eht_width_320 = true;
+ 		}
+-
+-		/* One entry is enough to determine band capabilities */
+-		break;
+ 	}
+ 
+ 	/*
