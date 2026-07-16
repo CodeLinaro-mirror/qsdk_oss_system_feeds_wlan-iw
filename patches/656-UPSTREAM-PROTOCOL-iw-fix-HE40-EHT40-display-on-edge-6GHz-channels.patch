@@ -1,0 +1,42 @@
+From: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+Date: Tue, 8 Jul 2026 00:00:00 +0000
+Subject: [PATCH] UPSTREAM:PROTOCOL:iw: fix HE40/EHT40 display on edge 6 GHz channels
+
+The HE40 and EHT40 channel-width tokens were missing on the first and
+last 6 GHz channels (e.g. 5955 MHz [1] and 7115 MHz [233]) in the
+"iw phyxx channels" output.
+
+The guard requires both NO_HT40_MINUS and NO_HT40_PLUS to be absent.
+Edge channels have one direction blocked (no adjacent channel below or
+above the band edge) but the other direction is valid. For 6 GHz HE,
+40 MHz operation is available as long as at least one pairing direction
+exists.
+
+Fix by requiring only one direction to be clear (OR instead of AND),
+matching the actual 40 MHz availability for these channels.
+
+Feature: REGULATORY
+
+Patch-dependency: 655-UPSTREAM-PROTOCOL-iw-fix-6GHz-iftype-data-ordering-assumption.patch
+
+Change-Id: I4594481fix2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+Signed-off-by: Hariharan Basuthkar <hbasuthk@qti.qualcomm.com>
+--- a/phy.c
++++ b/phy.c
+@@ -265,12 +265,12 @@
+ 					if (ctx->width_160 && !tb_freq[NL80211_FREQUENCY_ATTR_NO_160MHZ])
+ 						printf(" VHT160");
+ 					if (ctx->he_width_40 &&
+-					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] &&
+-					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS])
++					    (!tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] ||
++					     !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS]))
+ 						printf(" HE40");
+ 					if (ctx->eht_width_40 &&
+-					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] &&
+-					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS])
++					    (!tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_MINUS] ||
++					     !tb_freq[NL80211_FREQUENCY_ATTR_NO_HT40_PLUS]))
+ 						printf(" EHT40");
+ 					if (ctx->he_width_80 &&
+ 					    !tb_freq[NL80211_FREQUENCY_ATTR_NO_80MHZ])
