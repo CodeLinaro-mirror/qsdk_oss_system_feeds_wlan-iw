@@ -234,7 +234,7 @@ Signed-off-by: Karthikeyan Kathirvel <karthikeyan.kathirvel@oss.qualcomm.com>
  	__NL80211_BAND_IFTYPE_ATTR_AFTER_LAST,
 --- a/util.c
 +++ b/util.c
-@@ -1742,6 +1742,141 @@ void print_eht_info(struct nlattr *nl_if
+@@ -1742,6 +1742,143 @@ void print_eht_info(struct nlattr *nl_if
  			 he_phy_cap, true);
  }
  
@@ -290,11 +290,13 @@ Signed-off-by: Karthikeyan Kathirvel <karthikeyan.kathirvel@oss.qualcomm.com>
 +	PRINT_UHR_MAC_CAP(20, "TXSPG Supported");
 +	PRINT_UHR_MAC_CAP(21, "TXOP return in TXSPG Supported");
 +	PRINT_UHR_MAC_CAP_MASK(22, 0xf, "UHR oper mode param update timeout");
-+	PRINT_UHR_MAC_CAP_MASK(26, 0x7, "Param update adv notify interval");
-+	PRINT_UHR_MAC_CAP_MASK(29, 0x1f, "Update ind in TIM interval");
-+	PRINT_UHR_MAC_CAP(34, "Bounded ESS");
-+	PRINT_UHR_MAC_CAP(35, "BTM Assurance");
-+	PRINT_UHR_MAC_CAP(36, "Co-BF Supported");
++	PRINT_UHR_MAC_CAP_MASK(26, 0x1f, "Param update adv notify interval");
++	PRINT_UHR_MAC_CAP_MASK(31, 0x1f, "Update ind in TIM interval");
++	PRINT_UHR_MAC_CAP(36, "Bounded ESS");
++	PRINT_UHR_MAC_CAP(37, "BTM Assurance");
++	PRINT_UHR_MAC_CAP(38, "Co-BF Supported");
++	PRINT_UHR_MAC_CAP(39, "Co-SR Supported");
++	PRINT_UHR_MAC_CAP(40, "MAPC Enhanced Measurement Supported");
 +
 +	printf("%s\t\tUHR PHY Capabilities: (0x", pre);
 +	for (i = 0; i < 5; i++)
