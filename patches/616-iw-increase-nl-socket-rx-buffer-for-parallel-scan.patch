@@ -1,0 +1,34 @@
+From: Vinay Adella <vadella@qti.qualcomm.com>
+Date: Fri, 3 Jul 2026 11:42:13 +0530
+Subject: [PATCH] iw: increase netlink socket rx buffer size for parallel scan
+
+With WIPHY_FLAG_SUPPORTS_PARALLEL_HW_SCAN enabled, two concurrent scans
+on different radios complete nearly simultaneously and the kernel delivers
+two NL80211_CMD_NEW_SCAN_RESULTS multicast events in rapid succession.
+The subsequent NL80211_CMD_GET_SCAN dump also returns BSS entries from
+both radios in one shot.
+
+The hardcoded 8192 byte rx buffer is too small to hold the combined scan
+results, causing nl_recvmsgs() to return ENOBUFS (-105) and the scan
+results to be lost.
+
+Increase the rx buffer to 1 MB, matching what wpa_supplicant and hostapd
+use for the same reason.
+
+Signed-off-by: Vinay Adella <vadella@qti.qualcomm.com>
+---
+ iw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/iw.c
++++ b/iw.c
+@@ -61,7 +61,8 @@ static int nl80211_init(struct nl80211_state *state)
+ 		goto out_handle_destroy;
+ 	}
+
+-	nl_socket_set_buffer_size(state->nl_sock, 8192, 8192);
++	/* Increase rx buffer to 1 MB to handle parallel scan results */
++	nl_socket_set_buffer_size(state->nl_sock, 1024 * 1024, 8192);
+
+ 	/* try to set NETLINK_EXT_ACK to 1, ignoring errors */
+ 	err = 1;
