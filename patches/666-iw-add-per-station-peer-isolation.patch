@@ -1,0 +1,176 @@
+From: Amruth S <amrus@qti.qualcomm.com>
+Subject: [PATCH 2/2] UPSTREAM: PROTOCOL: iw: add per-station peer isolation support
+
+Add support for setting and displaying per-station peer isolation via
+the NL80211_ATTR_STA_ISOLATED netlink attribute.
+
+When a station is isolated, intra-BSS forwarding to and from that
+station is disabled at the AP. Traffic from an isolated station is
+redirected to the bridge/network stack instead of being forwarded
+directly to other associated stations.
+
+Add support for:
+
+  iw dev <devname> station set <MAC> isolated <0|1>
+
+where:
+
+  0 - disable isolation (default, normal forwarding)
+  1 - enable isolation (block intra-BSS forwarding)
+
+Also display the current isolation state in:
+
+  iw dev <devname> station get <MAC>
+  iw dev <devname> station dump
+
+Example:
+
+  # Enable isolation for a station
+  iw dev wlan0 station set aa:bb:cc:dd:ee:ff isolated 1
+
+  # Verify
+  iw dev wlan0 station get aa:bb:cc:dd:ee:ff
+
+  Station aa:bb:cc:dd:ee:ff (on wlan0)
+      ...
+      isolated: 1
+
+Change-Id: Ibd4be8c49dcdbda8953b50387585b9fc77b8b1d0
+Signed-off-by: Amruth S From: Amruth S <amrus@qti.qualcomm.com>
+Index: iw-6.9/station.c
+===================================================================
+--- iw-6.9.orig/station.c
++++ iw-6.9/station.c
+@@ -523,6 +523,7 @@ static int print_sta_handler(struct nl_m
+ 		[NL80211_STA_INFO_CONNECTED_TO_AS] = { .type = NLA_U8 },
+ 		[NL80211_STA_INFO_CONNECTED_TO_GATE] = { .type = NLA_U8 },
+ 		[NL80211_STA_INFO_RX_RETRIES] = { .type = NLA_U32},
++		[NL80211_STA_INFO_ISOLATED] = { .type = NLA_U8},
+ 	};
+ 	char *chain;
+ 	struct timeval now;
+@@ -825,6 +826,10 @@ static int print_sta_handler(struct nl_m
+ 		printf("\trx retries:\t%u\n",
+ 			nla_get_u32(sinfo[NL80211_STA_INFO_RX_RETRIES]));
+ 
++	if (sinfo[NL80211_STA_INFO_ISOLATED])
++		printf("\tisolated:\t%u\n",
++				nla_get_u8(sinfo[NL80211_STA_INFO_ISOLATED]));
++
+ 	/* print link specific fields */
+ 	if (tb[NL80211_ATTR_MLO_LINKS]) {
+ 		int ret = 0;
+@@ -958,6 +963,7 @@ static const struct cmd *station_set_mes
+ static const struct cmd *station_set_airtime_weight;
+ static const struct cmd *station_set_txpwr;
+ static const struct cmd *station_set_mgmt_rts_cts;
++static const struct cmd *station_set_isolated;
+ 
+ static const struct cmd *select_station_cmd(int argc, char **argv)
+ {
+@@ -975,6 +981,8 @@ static const struct cmd *select_station_
+ 		return station_set_txpwr;
+ 	if (strcmp(argv[1], "mgmt_rts_cts") == 0)
+ 		return station_set_mgmt_rts_cts;
++	if (strcmp(argv[1], "isolated") == 0)
++		return station_set_isolated;
+ 	return NULL;
+ }
+ 
+@@ -1294,6 +1302,56 @@ COMMAND_ALIAS(station, set, "<MAC addres
+ 	"Enable/Disable rts/cts for management frames",
+ 	select_station_cmd, station_set_mgmt_rts_cts);
+ 
++static int handle_station_set_isolated(struct nl80211_state *state,
++				       struct nl_msg *msg,
++				       int argc, char **argv,
++				       enum id_input id)
++{
++	unsigned char mac_addr[ETH_ALEN];
++	uint8_t isolated;
++
++	if (argc != 3)
++		return 1;
++
++	if (mac_addr_a2n(mac_addr, argv[0])) {
++		fprintf(stderr, "invalid mac address\n");
++		return 2;
++	}
++	argc--;
++	argv++;
++
++	if (strcmp("isolated", argv[0]) != 0)
++		return 1;
++	argc--;
++	argv++;
++
++	if (strcmp("1", argv[0]) == 0)
++		isolated = 1;
++	else if (strcmp("0", argv[0]) == 0)
++		isolated = 0;
++	else {
++		fprintf(stderr, "invalid value for isolated: use 0 or 1\n");
++		return 2;
++	}
++	argc--;
++	argv++;
++
++	if (argc)
++		return 1;
++
++	NLA_PUT(msg, NL80211_ATTR_MAC, ETH_ALEN, mac_addr);
++	NLA_PUT_U8(msg, NL80211_ATTR_STA_ISOLATED, isolated);
++
++	return 0;
++nla_put_failure:
++	return -ENOBUFS;
++}
++COMMAND_ALIAS(station, set, "<MAC address> isolated <0|1>",
++	NL80211_CMD_SET_STATION, 0, CIB_NETDEV, handle_station_set_isolated,
++	"Enable (1) or disable (0) peer isolation for this station.\n"
++	"When isolated, intra-BSS forwarding to/from this station is blocked.",
++	select_station_cmd, station_set_isolated);
++
+ static int handle_station_dump(struct nl80211_state *state,
+ 			       struct nl_msg *msg,
+ 			       int argc, char **argv,
+Index: iw-6.9/nl80211.h
+===================================================================
+--- iw-6.9.orig/nl80211.h
++++ iw-6.9/nl80211.h
+@@ -3198,6 +3198,10 @@ enum nl80211_commands {
+  *      %NL80211_CMD_SET_STATION), this flag is sent on %NL80211_CMD_NEW_STA
+  *      and %NL80211_CMD_ADD_LINK_STA to indicate an in-progress BSS transition.
+  *
++ * @NL80211_ATTR_STA_ISOLATED: u8 attribute to enable or disable
++ *     isolation from peer stations i.e, enable /disable intra-bss
++ *     forwarding for this station. 0 = not-isolated 1 = isolated
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3887,6 +3891,7 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_MAPC_HW_CAPS,
+ 	NL80211_ATTR_MAPC_MAX_CTDMA_PEERS,
+ 	NL80211_ATTR_SMD_ROAM_STA,
++	NL80211_ATTR_STA_ISOLATED,
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+@@ -4439,6 +4444,8 @@ enum nl80211_sta_bss_param {
+  *	authentication server (u8, 0 or 1)
+  * @NL80211_STA_INFO_RX_RETRIES: number of rx packets(MPDUs) from this station
+  *	with retry bit set (u32)
++ * @NL80211_STA_INFO_ISOLATED: Indicates if peer isolation is enabled or
++ *     disabled for this station (u8, 0 or 1)
+  * @__NL80211_STA_INFO_AFTER_LAST: internal
+  * @NL80211_STA_INFO_MAX: highest possible station info attribute
+  */
+@@ -4488,6 +4495,7 @@ enum nl80211_sta_info {
+ 	NL80211_STA_INFO_ASSOC_AT_BOOTTIME,
+ 	NL80211_STA_INFO_CONNECTED_TO_AS,
+ 	NL80211_STA_INFO_RX_RETRIES,
++	NL80211_STA_INFO_ISOLATED,
+ 
+ 	/* keep last */
+ 	__NL80211_STA_INFO_AFTER_LAST,

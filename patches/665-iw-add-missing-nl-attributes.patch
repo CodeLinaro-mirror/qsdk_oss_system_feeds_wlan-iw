@@ -1,0 +1,232 @@
+From: Amruth S <amrus@qti.qualcomm.com>
+Subject: [PATCH 1/2] UPSTREAM: PROTOCOL: iw: sync station nl80211 attributes
+
+Add missing nl80211 attributes in iw from the qsdk nl80211 attributes
+defined under mac80211.
+
+This avoids hardcoding enum values in iw's local nl80211.h copy and
+keeps the userspace definitions aligned with the kernel interface.
+
+No functional changes are introduced by this patch. It only updates
+the required nl80211 attribute definitions that are used by the
+subsequent per-station isolation support implementation.
+
+Change-Id: Ie357a9d530660928c0b813c80eb9c340e8205efd
+Signed-off-by: Amruth S <amrus@qti.qualcomm.com>
+Index: iw-6.9/nl80211.h
+===================================================================
+--- iw-6.9.orig/nl80211.h
++++ iw-6.9/nl80211.h
+@@ -3056,6 +3056,148 @@ enum nl80211_commands {
+  * @NL80211_ATTR_STA_DFS_EN: flag/u8 attribute to enable or disable
+  *	Station DFS (Dynamic Frequency Selection) support. Only applicable
+  *	in ETSI regulatory domains. 0 = disabled, 1 = enabled.
++  * @NL80211_ATTR_SMD_ENABLED: Flag attribute indication SMD (Seamless Mobility
++ *      key parameters for SMD Per-AP MLD PTK mode key exhange. Use with
++ *      %NL80211_CMD_ASSOCIATE for SMD Mode 1 Association
++ *
++ * @NL80211_ATTR_SMD_PTK_MODE: U8 Attribute specifying the SMD PTK Mode.
++ *      0 = Per-SMD PTK mode (Mode 0), 1 = Per-AP MLD PTK mode (Mode 1),
++ *      Used with %NL80211_CMD_ASSOCIATE for SMD key management configuration.
++ *
++ * @NL80211_ATTR_SMD_KDK: Binary attribute containing the SMD KDK used
++ *      for PTK Mode 1 (Per-AP MLD PTK).
++ *
++ * @NL80211_ATTR_DH_PARAMS: Binary Attribute containing Diffie-Hellman public
++ *      key parameters for SMD Per-AP MLD PTK mode key exhange. Use with
++ *      NL80211_CMD_ASSOCIATE for SMD Mode 1 Association
++ *
++ * @NL80211_ATTR_SMD_IDENTIFIER, Binary attribute containing the 6-byte
++ *      SMD identifier for SMD domain association context. Used with SMD
++ *      association commands for identification and PMKSA management.
++ *
++ * @NL80211_ATTR_SMD_DISCOVERY_TARGETS: Nested attribute containing
++ *      the discovered SMD group members during discovery.
++ *
++ * @NL80211_ATTR_SMD_SUPPORT: Flag attribute indicating that HW
++ *      supports roaming within a seamless mobility domain (SMD).
++ *
++ * @NL80211_ATTR_SMD_AP: Flag attribute indicating that HW is capable
++ *      of moving a client between APs within a seamless mobility
++ *      domain (SMD).
++ *
++ * @NL80211_ATTR_SMD_PARAMS: Nested attribute containing SMD parameters
++ *      for a given STA.
++ *
++ * @NL80211_ATTR_SMD_STA: Flag attribute indicating if a STA supports
++ *      SMD roaming.
++ *
++ * @NL80211_ATTR_SMD_STA_DL_DATA_FWD: Flag attribute indicating that
++ *      HW is capable of forwarding MSDUs when roaming a client between
++ *      APs within a seamless mobility domain (SMD).
++ *
++ * @NL80211_ATTR_SMD_CONFIG: Nested attribute indicating the
++ *      configurations of an SMD node (AP or STA).
++ *
++ * @NL80211_ATTR_SMD_TIMEOUT: u8 attribute indicating the timeout
++ *      for the SMD preparation state for a STA.
++ *
++ * @NL80211_ATTR_UHR_MODE_UPDATE_PARAMS: Nested attribute carrying per-link
++ *      UHR mode update parameters for %NL80211_CMD_UHR_MODE_UPDATE. Each
++ *      nested element contains a link ID and optional NPCA/DSO sub-attributes
++ *      (see &enum nl80211_uhr_mode_update_attrs).
++ *
++ * @NL80211_ATTR_CU_TYPE: (u8) Critical Update type, see &enum nl80211_cu_type.
++ *      Used with %NL80211_CMD_CRITICAL_UPDATE.
++ *
++ * @NL80211_ATTR_EPP_PEER: A flag attribute to indicate if the peer
++ *      is an EPP STA. Used with %NL80211_CMD_NEW_STA and
++ *      %NL80211_CMD_ADD_LINK_STA
++ *
++ * @NL80211_ATTR_CU_STATE: (u32) Current CU session state,
++ *      see &enum nl80211_cu_state. Carried in
++ *      %NL80211_CMD_CRITICAL_UPDATE_NOTIFY events.
++ *
++ * @NL80211_ATTR_EPP_PEER: A flag attribute to indicate if the peer is an EPP
++ *      STA. Used with %NL80211_CMD_NEW_STA and %NL80211_CMD_ADD_LINK_STA
++ *
++ * @NL80211_ATTR_SMD_TARGET_MLD_ADDR: Binary attribute containing the 6-byte
++ *      MAC address of the target AP MLD for SMD BSS Transition.
++ *
++ * @NL80211_ATTR_SMD_SNONCE: Binary attribute containing the STA nonce
++ *      (SNonce) used for PTK derivation during ST Preparation.
++ *
++ * @NL80211_ATTR_SMD_ANONCE: Binary attribute containing the AP nonce
++ *      (ANonce) returned by the target AP in the ST Prep Response.
++ *
++ * @NL80211_ATTR_SMD_SCS_LIST: Binary attribute containing the SCS
++ *      prioritization list for the SMD BSS Transition.
++ *
++ * @NL80211_ATTR_SMD_AID: u16 attribute containing the AID assigned by
++ *      the target AP upon successful ST Preparation.
++ *
++ * @NL80211_ATTR_SMD_DH_PUBLIC_KEY: Binary attribute containing the
++ *      Diffie-Hellman public key used for PTK derivation.
++ *
++ * @NL80211_ATTR_SMD_TRANSITION_TYPE: u8 attribute identifying the SMD BSS
++ *      Transition phase.  Values defined in &enum nl80211_smd_transition_type.
++ *
++ * @NL80211_ATTR_PEER_SMD_ENABLED: Flag indicating a peer STA has SMD enabled.
++ *
++ * @NL80211_ATTR_PEER_SMD_MAC_ADDR: Binary attribute with the 6-byte MAC
++ *      address of the SMD-capable peer STA.
++ *
++ * @NL80211_ATTR_PEER_SMD_DL_DATA_FWD: Flag indicating the peer STA supports
++ *      DL data forwarding within the SMD domain.
++ *
++ * @NL80211_ATTR_UHR_RECONFIG_TYPE: u8 attribute specifying the UHR Link
++ *      Reconfiguration frame type: 0 = ST Preparation, 1 = ST Execution.
++ *
++ * @NL80211_ATTR_SMD_EXEC_PATH: u8 attribute specifying the ST Execution path:
++ *      0 = via current AP (SAP), 1 = direct to target AP (TAP).
++ *
++ * @NL80211_ATTR_SMD_DL_TID_BITMAP: u8 attribute containing the DL TID bitmap
++ *      for traffic draining during ST Execution.
++ *
++ * @NL80211_ATTR_SMD_ROLE: u8 attribute indicating the SMD role of the device.
++ *
++ * @NL80211_ATTR_SMD_TYPE: u8 attribute indicating the SMD domain type.
++ *
++ * @NL80211_ATTR_SMD_DL_SN_NOT_TRANSFERRED: Flag requesting that the DL
++ *      sequence number is not transferred to the target AP.
++ *
++ * @NL80211_ATTR_SMD_UL_SN_NOT_TRANSFERRED: Flag requesting that the UL
++ *      sequence number is not transferred to the target AP.
++ *
++ * @NL80211_ATTR_SMD_DL_DRAIN_TIME: u16 attribute specifying the DL drain
++ *      timeout in TUs granted by the target AP in the ST Exec Response.
++ *
++ * @NL80211_ATTR_SMD_PREFERRED_TARGET: Flag marking this target as the
++ *      preferred transition target; triggers driver resource allocation at
++ *      PREP-response time rather than deferring to EXEC time.
++ *
++ * @NL80211_ATTR_SMD_LINK_TRANSITION_STATE: u8 attribute carrying the current
++ *      link distribution state.  Values defined in
++ *      &enum nl80211_smd_link_transition_state.
++ *
++ * @NL80211_ATTR_SMD_CTX: Nested attribute associated with UHR SMD BSS
++ *      Transition data. See &enum nl80211_smd_ctx.
++ *
++ * @NL80211_ATTR_STA_MAPC: Nested attribute carrying MAPC parameters for a
++ *      particular peer. See &enum nl80211_sta_mapc_attr.
++ *
++ * @NL80211_ATTR_MAPC_HW_CAPS: u32. MAPC hardware capability bitmap
++ *      reported by the driver. 0 = not supported.
++ *
++ * @NL80211_ATTR_MAPC_MAX_CTDMA_PEERS: u8. Maximum number of Co-TDMA peers
++ *      supported by the hardware. 0 = not reported.
++ *
++ * @NL80211_ATTR_SMD_ROAM_STA: Flag attribute indicating this station was
++ *      created via SMD Station Transition Preparation (IAP) at the Target
++ *      AP-MLD, not via a regular association. Unlike %NL80211_ATTR_PEER_SMD_*
++ *      attributes (which describe peer capabilities and are sent on
++ *      %NL80211_CMD_SET_STATION), this flag is sent on %NL80211_CMD_NEW_STA
++ *      and %NL80211_CMD_ADD_LINK_STA to indicate an in-progress BSS transition.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3688,6 +3830,63 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_MAX_CH_SWITCH_TIME,
+ 
+ 	NL80211_ATTR_STA_DFS_EN,
++	NL80211_ATTR_SMD_ENABLED,
++	NL80211_ATTR_SMD_PTK_MODE,
++	NL80211_ATTR_SMD_KDK,
++	NL80211_ATTR_DH_PARAMS,
++	NL80211_ATTR_SMD_IDENTIFIER,
++	NL80211_ATTR_SMD_DISCOVERY_TARGETS,
++	NL80211_ATTR_SMD_SUPPORT,
++	NL80211_ATTR_SMD_AP,
++	NL80211_ATTR_SMD_PARAMS,
++	NL80211_ATTR_SMD_STA_DL_DATA_FWD,
++	NL80211_ATTR_SMD_STA,
++	NL80211_ATTR_SMD_CONFIG,
++	NL80211_ATTR_SMD_TIMEOUT,
++
++	NL80211_ATTR_UHR_MODE_UPDATE_PARAMS,
++	NL80211_ATTR_CU_TYPE,
++	NL80211_ATTR_CU_STATE,
++
++	NL80211_ATTR_EPP_PEER,
++
++	NL80211_ATTR_SMD_TARGET_MLD_ADDR,
++	NL80211_ATTR_SMD_SNONCE,
++	NL80211_ATTR_SMD_ANONCE,
++	NL80211_ATTR_SMD_SCS_LIST,
++	NL80211_ATTR_SMD_AID,
++	NL80211_ATTR_SMD_DH_PUBLIC_KEY,
++
++	NL80211_ATTR_SMD_TRANSITION_TYPE,
++
++	NL80211_ATTR_PEER_SMD_ENABLED,
++	NL80211_ATTR_PEER_SMD_MAC_ADDR,
++	NL80211_ATTR_PEER_SMD_DL_DATA_FWD,
++
++	NL80211_ATTR_UHR_RECONFIG_TYPE,
++
++	NL80211_ATTR_SMD_EXEC_PATH,
++	NL80211_ATTR_SMD_DL_TID_BITMAP,
++
++	NL80211_ATTR_SMD_ROLE,
++	NL80211_ATTR_SMD_TYPE,
++	NL80211_ATTR_SMD_DL_SN_NOT_TRANSFERRED,
++	NL80211_ATTR_SMD_UL_SN_NOT_TRANSFERRED,
++	NL80211_ATTR_SMD_DL_DRAIN_TIME,
++
++	NL80211_ATTR_SMD_STA_LINK_MACS,
++	NL80211_ATTR_SMD_STA_LINK_MAC,
++
++	NL80211_ATTR_SMD_PREFERRED_TARGET,
++
++	NL80211_ATTR_SMD_LINK_TRANSITION_STATE,
++
++	NL80211_ATTR_SMD_CTX,
++
++	NL80211_ATTR_STA_MAPC,
++	NL80211_ATTR_MAPC_HW_CAPS,
++	NL80211_ATTR_MAPC_MAX_CTDMA_PEERS,
++	NL80211_ATTR_SMD_ROAM_STA,
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
