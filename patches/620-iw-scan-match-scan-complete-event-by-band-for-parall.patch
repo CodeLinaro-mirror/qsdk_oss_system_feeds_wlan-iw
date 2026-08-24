@@ -1,0 +1,304 @@
+From c4068cf4eb42728804d6ae68b70db715d5dfe4e3 Mon Sep 17 00:00:00 2001
+From: Vinay Adella <vadella@qti.qualcomm.com>
+Date: Wed, 17 Jun 2026 11:15:09 +0530
+Subject: [PATCH] iw: scan: match scan-complete event by band for parallel scan
+ support
+
+When multiple "iw dev scan" commands are issued in parallel on a driver
+that supports concurrent scanning across different bands (each band has
+its own HW), all instances share the same nl80211 multicast group and
+wake up on the first NL80211_CMD_NEW_SCAN_RESULTS event regardless of
+which band it belongs to.
+
+Fix this by deriving a band bitmask from the explicit "freq" arguments
+supplied to the scan command and passing it down to the event listener.
+The listener then inspects NL80211_ATTR_SCAN_FREQUENCIES in each
+incoming scan event and only accepts the event if at least one of the
+reported frequencies belongs to the requested band.
+
+When no frequencies are specified (full-band scan), the band mask is 0
+and the filter is bypassed, preserving the original behaviour.
+
+New helpers introduced:
+  - freq_to_band() / scan_argv_band_mask() in scan.c
+  - event_matches_band() in event.c
+  - listen_events_on_band() / __do_listen_events_on_band() in event.c
+
+Note: parallel scans on different frequencies of the same band are not
+supported by the driver, so band-level matching is sufficient.
+
+Signed-off-by: Vinay Adella <vadella@qti.qualcomm.com>
+---
+ event.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ iw.h    |   8 +++++
+ scan.c  |  62 +++++++++++++++++++++++++++++++--
+ 3 files changed, 170 insertions(+), 4 deletions(-)
+
+diff --git a/event.c b/event.c
+index 8f16ac3..9c92069 100644
+--- a/event.c
++++ b/event.c
+@@ -1319,8 +1319,59 @@ struct wait_event {
+ 	const __u32 *prints;
+ 	__u32 cmd;
+ 	struct print_event_args *pargs;
++	/*
++	 * band_mask: bitmask of BIT(NL80211_BAND_*) values that this listener
++	 * cares about.  When non-zero, a scan-complete event is only accepted
++	 * if at least one of the frequencies reported in the event belongs to
++	 * one of the requested bands.  This lets parallel iw scan instances
++	 * running on different bands each pick up only their own event.
++	 * A value of 0 disables the filter (accept any band).
++	 */
++	uint32_t band_mask;
+ };
+ 
++/*
++ * event_matches_band - return true when the scan event's frequency list
++ * contains at least one frequency that maps to a band in band_mask.
++ *
++ * The kernel always includes NL80211_ATTR_SCAN_FREQUENCIES in
++ * NL80211_CMD_NEW_SCAN_RESULTS and NL80211_CMD_SCAN_ABORTED events,
++ * listing the channels that were actually scanned.  We use this to
++ * distinguish events from parallel scans running on different bands.
++ */
++static bool event_matches_band(struct nl_msg *msg, uint32_t band_mask)
++{
++	struct nlattr *tb[NL80211_ATTR_MAX + 1];
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++	struct nlattr *nst;
++	int rem;
++
++	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
++		  genlmsg_attrlen(gnlh, 0), NULL);
++
++	if (!tb[NL80211_ATTR_SCAN_FREQUENCIES])
++		return true; /* no freq list — cannot filter, accept it */
++
++	nla_for_each_nested(nst, tb[NL80211_ATTR_SCAN_FREQUENCIES], rem) {
++		uint32_t freq = nla_get_u32(nst);
++		uint32_t b = 0;
++
++		if (freq >= 2412 && freq <= 2484)
++			b = BIT(NL80211_BAND_2GHZ);
++		else if ((freq >= 4910 && freq <= 4980) ||
++			 (freq >= 5180 && freq <= 5895))
++			b = BIT(NL80211_BAND_5GHZ);
++		else if (freq >= 5925 && freq <= 7125)
++			b = BIT(NL80211_BAND_6GHZ);
++		else if (freq >= 58320 && freq <= 70200)
++			b = BIT(NL80211_BAND_60GHZ);
++
++		if (b & band_mask)
++			return true;
++	}
++	return false;
++}
++
+ static int wait_event(struct nl_msg *msg, void *arg)
+ {
+ 	struct wait_event *wait = arg;
+@@ -1335,8 +1386,20 @@ static int wait_event(struct nl_msg *msg, void *arg)
+ 	}
+ 
+ 	for (i = 0; i < wait->n_cmds; i++) {
+-		if (gnlh->cmd == wait->cmds[i])
+-			wait->cmd = gnlh->cmd;
++		if (gnlh->cmd != wait->cmds[i])
++			continue;
++		/*
++		 * When a band filter is active, only accept the event if its
++		 * scanned-frequency list overlaps with our requested band(s).
++		 * This prevents a parallel scan on a different band from
++		 * prematurely unblocking this listener.
++		 */
++		if (wait->band_mask &&
++		    (gnlh->cmd == NL80211_CMD_NEW_SCAN_RESULTS ||
++		     gnlh->cmd == NL80211_CMD_SCAN_ABORTED) &&
++		    !event_matches_band(msg, wait->band_mask))
++			continue;
++		wait->cmd = gnlh->cmd;
+ 	}
+ 
+ 	return NL_SKIP;
+@@ -1400,6 +1463,16 @@ __u32 __do_listen_events(struct nl80211_state *state,
+ 			 const int n_waits, const __u32 *waits,
+ 			 const int n_prints, const __u32 *prints,
+ 			 struct print_event_args *args)
++{
++	return __do_listen_events_on_band(state, n_waits, waits,
++					  n_prints, prints, args, 0);
++}
++
++__u32 __do_listen_events_on_band(struct nl80211_state *state,
++				 const int n_waits, const __u32 *waits,
++				 const int n_prints, const __u32 *prints,
++				 struct print_event_args *args,
++				 uint32_t band_mask)
+ {
+ 	struct nl_cb *cb = nl_cb_alloc(iw_debug ? NL_CB_DEBUG : NL_CB_DEFAULT);
+ 	struct wait_event wait_ev;
+@@ -1419,6 +1492,7 @@ __u32 __do_listen_events(struct nl80211_state *state,
+ 		wait_ev.prints = prints;
+ 		wait_ev.n_prints = n_prints;
+ 		wait_ev.pargs = args;
++		wait_ev.band_mask = band_mask;
+ 		register_handler(wait_event, &wait_ev);
+ 	} else
+ 		register_handler(print_event, args);
+@@ -1445,6 +1519,32 @@ __u32 listen_events(struct nl80211_state *state,
+ 	return __do_listen_events(state, n_waits, waits, 0, NULL, NULL);
+ }
+ 
++/*
++ * listen_events_on_band - like listen_events() but only unblocks when the
++ * received scan event's frequency list overlaps with @band_mask.
++ *
++ * @band_mask: bitmask of BIT(NL80211_BAND_*).  Pass 0 to accept any band
++ *             (identical behaviour to listen_events()).
++ *
++ * This is used by "iw dev scan" to avoid being woken up by a parallel scan
++ * running on a different band.  Because the driver guarantees that parallel
++ * scans only occur across different bands (each band has its own HW), the
++ * frequency list in the event is a reliable discriminator.
++ */
++__u32 listen_events_on_band(struct nl80211_state *state,
++			    const int n_waits, const __u32 *waits,
++			    uint32_t band_mask)
++{
++	int ret;
++
++	ret = __prepare_listen_events(state);
++	if (ret)
++		return ret;
++
++	return __do_listen_events_on_band(state, n_waits, waits,
++					  0, NULL, NULL, band_mask);
++}
++
+ static int print_events(struct nl80211_state *state,
+ 			struct nl_msg *msg,
+ 			int argc, char **argv,
+diff --git a/iw.h b/iw.h
+index dd4858e..b62d828 100644
+--- a/iw.h
++++ b/iw.h
+@@ -437,11 +437,19 @@ struct print_event_args {
+ 
+ __u32 listen_events(struct nl80211_state *state,
+ 		    const int n_waits, const __u32 *waits);
++__u32 listen_events_on_band(struct nl80211_state *state,
++			    const int n_waits, const __u32 *waits,
++			    uint32_t band_mask);
+ int __prepare_listen_events(struct nl80211_state *state);
+ __u32 __do_listen_events(struct nl80211_state *state,
+ 			 const int n_waits, const __u32 *waits,
+ 			 const int n_prints, const __u32 *prints,
+ 			 struct print_event_args *args);
++__u32 __do_listen_events_on_band(struct nl80211_state *state,
++				 const int n_waits, const __u32 *waits,
++				 const int n_prints, const __u32 *prints,
++				 struct print_event_args *args,
++				 uint32_t band_mask);
+ 
+ int valid_handler(struct nl_msg *msg, void *arg);
+ void register_handler(int (*handler)(struct nl_msg *, void *), void *data);
+diff --git a/scan.c b/scan.c
+index ec24cdd..16ec585 100644
+--- a/scan.c
++++ b/scan.c
+@@ -12,6 +12,51 @@
+ #include "nl80211.h"
+ #include "iw.h"
+ 
++/*
++ * freq_to_band - map a frequency (MHz) to its nl80211_band bitmask bit.
++ * Returns 0 if the frequency is not recognised.
++ */
++static uint32_t freq_to_band(unsigned int freq)
++{
++	if (freq >= 2412 && freq <= 2484)
++		return BIT(NL80211_BAND_2GHZ);
++	if ((freq >= 4910 && freq <= 4980) || (freq >= 5180 && freq <= 5895))
++		return BIT(NL80211_BAND_5GHZ);
++	if (freq >= 5925 && freq <= 7125)
++		return BIT(NL80211_BAND_6GHZ);
++	if (freq >= 58320 && freq <= 70200)
++		return BIT(NL80211_BAND_60GHZ);
++	return 0;
++}
++
++/*
++ * scan_argv_band_mask - walk the argv that will be passed to "scan trigger"
++ * and collect a bitmask of nl80211_band values for every explicit "freq N"
++ * argument found.  Returns 0 when no frequencies are specified (wildcard /
++ * full-band scan), which means "accept events from any band".
++ */
++static uint32_t scan_argv_band_mask(int argc, char **argv)
++{
++	uint32_t mask = 0;
++	int i;
++
++	for (i = 0; i < argc; i++) {
++		if (strcmp(argv[i], "freq") == 0) {
++			/* consume all numeric tokens that follow */
++			while (i + 1 < argc) {
++				char *end;
++				unsigned long f = strtoul(argv[i + 1], &end, 10);
++
++				if (*end != '\0')
++					break;
++				mask |= freq_to_band((unsigned int)f);
++				i++;
++			}
++		}
++	}
++	return mask;
++}
++
+ #define WLAN_CAPABILITY_ESS		(1<<0)
+ #define WLAN_CAPABILITY_IBSS		(1<<1)
+ #define WLAN_CAPABILITY_CF_POLLABLE	(1<<2)
+@@ -2747,7 +2792,9 @@ static int handle_scan_combined(struct nl80211_state *state,
+ 		NL80211_CMD_SCAN_ABORTED,
+ 	};
+ 	int trig_argc, dump_argc, err;
++	int trig_scan_argc;
+ 	int i;
++	uint32_t band_mask;
+ 
+ 	if (argc >= 3 && !strcmp(argv[2], "-u")) {
+ 		dump_argc = 4;
+@@ -2766,8 +2813,19 @@ static int handle_scan_combined(struct nl80211_state *state,
+ 	trig_argv[1] = "scan";
+ 	trig_argv[2] = "trigger";
+ 
+-	for (i = 0; i < argc - 2 - (dump_argc - 3); i++)
++	trig_scan_argc = argc - 2 - (dump_argc - 3);
++	for (i = 0; i < trig_scan_argc; i++)
+ 		trig_argv[i + 3] = argv[i + 2 + (dump_argc - 3)];
++
++	/*
++	 * Derive the band bitmask from the requested frequencies so that
++	 * listen_events() can ignore NL80211_CMD_NEW_SCAN_RESULTS events
++	 * that belong to a parallel scan running on a different band.
++	 * band_mask == 0 means no explicit frequencies were given (full scan),
++	 * in which case any scan-complete event is accepted.
++	 */
++	band_mask = scan_argv_band_mask(trig_scan_argc, trig_argv + 3);
++
+ 	err = handle_cmd(state, id, trig_argc, trig_argv);
+ 	free(trig_argv);
+ 	if (err)
+@@ -2797,7 +2855,7 @@ static int handle_scan_combined(struct nl80211_state *state,
+ 	 * Alas, the kernel doesn't do that (yet).
+ 	 */
+ 
+-	if (listen_events(state, ARRAY_SIZE(cmds), cmds) ==
++	if (listen_events_on_band(state, ARRAY_SIZE(cmds), cmds, band_mask) ==
+ 					NL80211_CMD_SCAN_ABORTED) {
+ 		printf("scan aborted!\n");
+ 		return 0;
+-- 
+2.34.1
+

@@ -1,0 +1,629 @@
+From dbec44ce47b89d53f275ea7f187a48ac88e567c9 Mon Sep 17 00:00:00 2001
+From: Vinay Adella <vadella@qti.qualcomm.com>
+Date: Fri, 3 Jul 2026 11:42:13 +0530
+Subject: [PATCH] iw: add band-based channel selection for scan commands
+
+Without this change, scanning a specific band requires the user
+to enumerate every frequency manually. Add a 'band 2g|5g|6g'
+token to 'iw scan', 'iw scan trigger', and 'iw scan sched_start'
+that automatically resolves all active channels for the requested
+band by querying NL80211_CMD_GET_WIPHY and populating
+NL80211_ATTR_SCAN_FREQUENCIES accordingly.
+
+New helper get_band_freqs() in util.c issues a GET_WIPHY request
+for the interface, walks NL80211_ATTR_WIPHY_BANDS for the target
+band index, and skips any frequency marked
+NL80211_FREQUENCY_ATTR_DISABLED.
+
+parse_sched_scan() is extended with state/ifindex parameters so
+the same band resolution is available for scheduled scans and
+WoWLAN net-detect triggers.
+
+Example usage:
+  iw dev wlan0 scan band 5g
+  iw dev wlan0 scan trigger band 6g
+  iw dev wlan0 scan sched_start interval 30000 band 2g
+
+Signed-off-by: Vinay Adella <vadella@qti.qualcomm.com>
+---
+ iw.h     |  10 ++-
+ scan.c   | 158 ++++++++++++++++++++++++++++++++--
+ util.c   | 251 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ wowlan.c |  18 +++-
+ 4 files changed, 426 insertions(+), 11 deletions(-)
+
+diff --git a/iw.h b/iw.h
+index b62d828..6cdf72e 100644
+--- a/iw.h
++++ b/iw.h
+@@ -522,13 +522,19 @@ int get_cf1(const struct chanmode *chanmode, unsigned long freq);
+ 
+ int parse_random_mac_addr(struct nl_msg *msg, char *addrs);
+ 
++#define GET_BAND_FREQS_MAX 256
++int get_band_freqs(struct nl80211_state *state, int ifindex,
++		   enum nl80211_band band,
++		   uint32_t *freqs, int max_freqs);
++
+ char *s1g_ss_max_support(__u8 maxss);
+ char *s1g_ss_min_support(__u8 minss);
+ 
+ #define SCHED_SCAN_OPTIONS "[interval <in_msecs> | scan_plans [<interval_secs:iterations>*] <interval_secs>] "	\
+-	"[delay <in_secs>] [freqs <freq>+] [matches [ssid <ssid>]+]] [active [ssid <ssid>]+|passive] "	\
++	"[delay <in_secs>] [freqs <freq>+] [band 2g|5g|6g] [matches [ssid <ssid>]+]] [active [ssid <ssid>]+|passive] "	\
+ 	"[randomise[=<addr>/<mask>]] [coloc] [flush]"
+-int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv);
++int parse_sched_scan(struct nl80211_state *state, int ifindex,
++		     struct nl_msg *msg, int *argc, char ***argv);
+ 
+ void nan_bf(uint8_t idx, uint8_t *bf, uint16_t bf_len, const uint8_t *buf,
+ 	    size_t len);
+diff --git a/scan.c b/scan.c
+index 16ec585..0a53909 100644
+--- a/scan.c
++++ b/scan.c
+@@ -1,4 +1,5 @@
+ #include <net/if.h>
++#include <stdint.h>
+ #include <errno.h>
+ #include <string.h>
+ #include <stdbool.h>
+@@ -32,8 +33,9 @@ static uint32_t freq_to_band(unsigned int freq)
+ /*
+  * scan_argv_band_mask - walk the argv that will be passed to "scan trigger"
+  * and collect a bitmask of nl80211_band values for every explicit "freq N"
+- * argument found.  Returns 0 when no frequencies are specified (wildcard /
+- * full-band scan), which means "accept events from any band".
++ * or "band 2g|5g|6g" argument found.  Returns 0 when no frequencies or
++ * bands are specified (wildcard / full scan), which means "accept events
++ * from any band".
+  */
+ static uint32_t scan_argv_band_mask(int argc, char **argv)
+ {
+@@ -52,6 +54,20 @@ static uint32_t scan_argv_band_mask(int argc, char **argv)
+ 				mask |= freq_to_band((unsigned int)f);
+ 				i++;
+ 			}
++		} else if (strcmp(argv[i], "band") == 0 && i + 1 < argc) {
++			const char *b = argv[i + 1];
++
++			if (strcasecmp(b, "2g") == 0 ||
++			    strcasecmp(b, "2ghz") == 0 ||
++			    strcasecmp(b, "2.4g") == 0)
++				mask |= BIT(NL80211_BAND_2GHZ);
++			else if (strcasecmp(b, "5g") == 0 ||
++				 strcasecmp(b, "5ghz") == 0)
++				mask |= BIT(NL80211_BAND_5GHZ);
++			else if (strcasecmp(b, "6g") == 0 ||
++				 strcasecmp(b, "6ghz") == 0)
++				mask |= BIT(NL80211_BAND_6GHZ);
++			i++;
+ 		}
+ 	}
+ 	return mask;
+@@ -114,7 +130,8 @@ union ieee80211_country_ie_triplet {
+ 	} __attribute__ ((packed)) ext;
+ } __attribute__ ((packed));
+ 
+-int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
++int parse_sched_scan(struct nl80211_state *state, int ifindex,
++		     struct nl_msg *msg, int *argc, char ***argv)
+ {
+ 	struct nl_msg *matchset = NULL, *freqs = NULL, *ssids = NULL;
+ 	struct nl_msg *scan_plans = NULL;
+@@ -133,6 +150,8 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
+ 	bool have_matchset = false, have_freqs = false, have_ssids = false;
+ 	bool have_active = false, have_passive = false, have_plans = false;
+ 	uint32_t flags = 0;
++	uint32_t band_freq_buf[GET_BAND_FREQS_MAX];
++	int band_count, bi;
+ 
+ 	matchset = nlmsg_alloc();
+ 	if (!matchset) {
+@@ -216,6 +235,56 @@ int parse_sched_scan(struct nl_msg *msg, int *argc, char ***argv)
+ 				}
+ 
+ 				i = 0;
++			} else if (!strcmp(v[0], "band")) {
++				enum nl80211_band band_id;
++
++				c--; v++;
++				if (c == 0) {
++					err = -EINVAL;
++					goto nla_put_failure;
++				}
++
++				if (strcasecmp(v[0], "2g") == 0 ||
++				    strcasecmp(v[0], "2ghz") == 0 ||
++				    strcasecmp(v[0], "2.4g") == 0) {
++					band_id = NL80211_BAND_2GHZ;
++				} else if (strcasecmp(v[0], "5g") == 0 ||
++					   strcasecmp(v[0], "5ghz") == 0) {
++					band_id = NL80211_BAND_5GHZ;
++				} else if (strcasecmp(v[0], "6g") == 0 ||
++					   strcasecmp(v[0], "6ghz") == 0) {
++					band_id = NL80211_BAND_6GHZ;
++				} else {
++					fprintf(stderr,
++						"invalid band '%s': use 2g, 5g, or 6g\n",
++						v[0]);
++					err = -EINVAL;
++					goto nla_put_failure;
++				}
++
++				if (ifindex < 0) {
++					fprintf(stderr,
++						"band scan: could not determine interface index\n");
++					err = -EINVAL;
++					goto nla_put_failure;
++				}
++
++				band_count = get_band_freqs(state, ifindex, band_id,
++							    band_freq_buf,
++							    GET_BAND_FREQS_MAX);
++				if (band_count <= 0) {
++					fprintf(stderr,
++						"band scan: no frequencies found for band '%s'\n",
++						v[0]);
++					err = (band_count < 0) ? band_count : -ENOENT;
++					goto nla_put_failure;
++				}
++
++				for (bi = 0; bi < band_count; bi++)
++					NLA_PUT_U32(freqs, i * GET_BAND_FREQS_MAX + bi,
++						    band_freq_buf[bi]);
++
++				have_freqs = true;
+ 			} else if (!strcmp(v[0], "freqs")) {
+ 				parse_state = ND_FREQS;
+ 				if (have_freqs) {
+@@ -429,6 +498,7 @@ static int handle_scan(struct nl80211_state *state,
+ 	enum {
+ 		NONE,
+ 		FREQ,
++		BAND,
+ 		MODE,
+ 		CHECK_SCAN_FLAG_AP,
+ 		IES,
+@@ -441,6 +511,8 @@ static int handle_scan(struct nl80211_state *state,
+ 	unsigned int duration = 0;
+ 	bool passive = false, have_ssids = false, have_freqs = false;
+ 	bool have_chandef = false;
++	uint32_t band_freq_buf[GET_BAND_FREQS_MAX];
++	int ifindex = -1;
+ 	bool duration_mandatory = false;
+ 	size_t ies_len = 0, meshid_len = 0;
+ 	unsigned char *ies = NULL, *meshid = NULL, *tmpies = NULL;
+@@ -457,6 +529,16 @@ static int handle_scan(struct nl80211_state *state,
+ 		return -ENOMEM;
+ 	}
+ 
++	{
++		struct nlattr *tb[NL80211_ATTR_MAX + 1];
++		struct nlmsghdr *nlh = nlmsg_hdr(msg);
++		nla_parse(tb, NL80211_ATTR_MAX,
++			  genlmsg_attrdata(nlmsg_data(nlh), 0),
++			  genlmsg_attrlen(nlmsg_data(nlh), 0), NULL);
++		if (tb[NL80211_ATTR_IFINDEX])
++			ifindex = (int)nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
++	}
++
+ 	for (i = 0; i < argc; i++) {
+ 		switch (parse) {
+ 		case NONE:
+@@ -492,6 +574,9 @@ static int handle_scan(struct nl80211_state *state,
+ 				parse = SSID;
+ 				have_ssids = true;
+ 				break;
++			} else if (strcmp(argv[i], "band") == 0) {
++				parse = BAND;
++				break;
+ 			} else if (strcmp(argv[i], "passive") == 0) {
+ 				parse = DONE;
+ 				passive = true;
+@@ -504,6 +589,54 @@ static int handle_scan(struct nl80211_state *state,
+ 				break;
+ 			}
+ 			/* fall through - this is an error */
++		case BAND: {
++			enum nl80211_band band_id;
++			int band_count, bi;
++
++			if (strcasecmp(argv[i], "2g") == 0 ||
++			    strcasecmp(argv[i], "2ghz") == 0 ||
++			    strcasecmp(argv[i], "2.4g") == 0) {
++				band_id = NL80211_BAND_2GHZ;
++			} else if (strcasecmp(argv[i], "5g") == 0 ||
++				   strcasecmp(argv[i], "5ghz") == 0) {
++				band_id = NL80211_BAND_5GHZ;
++			} else if (strcasecmp(argv[i], "6g") == 0 ||
++				   strcasecmp(argv[i], "6ghz") == 0) {
++				band_id = NL80211_BAND_6GHZ;
++			} else {
++				fprintf(stderr,
++					"invalid band '%s': use 2g, 5g, or 6g\n",
++					argv[i]);
++				err = 1;
++				goto nla_put_failure;
++			}
++
++			if (ifindex < 0) {
++				fprintf(stderr,
++					"band scan: could not determine interface index\n");
++				err = -EINVAL;
++				goto nla_put_failure;
++			}
++
++			band_count = get_band_freqs(state, ifindex, band_id,
++						    band_freq_buf,
++						    GET_BAND_FREQS_MAX);
++			if (band_count <= 0) {
++				fprintf(stderr,
++					"band scan: no frequencies found for band '%s'\n",
++					argv[i]);
++				err = (band_count < 0) ? band_count : -ENOENT;
++				goto nla_put_failure;
++			}
++
++			for (bi = 0; bi < band_count; bi++)
++				NLA_PUT_U32(freqs, i * GET_BAND_FREQS_MAX + bi,
++					    band_freq_buf[bi]);
++
++			have_freqs = true;
++			parse = NONE;
++			break;
++		}
+ 		case DONE:
+ 			err = 1;
+ 			goto nla_put_failure;
+@@ -2864,10 +2997,12 @@ static int handle_scan_combined(struct nl80211_state *state,
+ 	dump_argv[0] = argv[0];
+ 	return handle_cmd(state, id, dump_argc, dump_argv);
+ }
+-TOPLEVEL(scan, "[-u] [freq <freq>*] [HT40+|HT40-|80MHz] [duration <dur>] [ies <hex as 00:11:..>] [meshid <meshid>] [lowpri,flush,ap-force,duration-mandatory] [randomise[=<addr>/<mask>]] [ssid <ssid>*|passive]", 0, 0,
++TOPLEVEL(scan, "[-u] [freq <freq>*] [band 2g|5g|6g] [HT40+|HT40-|80MHz] [duration <dur>] [ies <hex as 00:11:..>] [meshid <meshid>] [lowpri,flush,ap-force,duration-mandatory] [randomise[=<addr>/<mask>]] [ssid <ssid>*|passive]", 0, 0,
+ 	 CIB_NETDEV, handle_scan_combined,
+ 	 "Scan on the given frequencies and probe for the given SSIDs\n"
+ 	 "(or wildcard if not given) unless passive scanning is requested.\n"
++	 "Use 'band 2g', 'band 5g', or 'band 6g' to scan all channels\n"
++	 "of a specific band without listing individual frequencies.\n"
+ 	 "If channel mode/width is provided along with frequency, only \n"
+ 	 "scanning on primary frequency of channel mode/width is done.\n"
+ 	 "If -u is specified print unknown data in the scan results.\n"
+@@ -2876,10 +3011,12 @@ COMMAND(scan, dump, "[-u]",
+ 	NL80211_CMD_GET_SCAN, NLM_F_DUMP, CIB_NETDEV, handle_scan_dump,
+ 	"Dump the current scan results. If -u is specified, print unknown\n"
+ 	"data in scan results.");
+-COMMAND(scan, trigger, "[freq <freq>*] [HT40+|HT40-|80MHz] [duration <dur>] [ies <hex as 00:11:..>] [meshid <meshid>] [lowpri,flush,ap-force,duration-mandatory,coloc] [randomise[=<addr>/<mask>]] [ssid <ssid>*|passive]",
++COMMAND(scan, trigger, "[freq <freq>*] [band 2g|5g|6g] [HT40+|HT40-|80MHz] [duration <dur>] [ies <hex as 00:11:..>] [meshid <meshid>] [lowpri,flush,ap-force,duration-mandatory,coloc] [randomise[=<addr>/<mask>]] [ssid <ssid>*|passive]",
+ 	NL80211_CMD_TRIGGER_SCAN, 0, CIB_NETDEV, handle_scan,
+ 	 "Trigger a scan on the given frequencies with probing for the given\n"
+ 	 "SSIDs (or wildcard if not given) unless passive scanning is requested.\n"
++	 "Use 'band 2g', 'band 5g', or 'band 6g' to scan all channels\n"
++	 "of a specific band without listing individual frequencies.\n"
+ 	 "If channel mode/width is provided along with frequency, only \n"
+ 	 "scanning on primary frequency of channel mode/width is done.\n"
+ 	 "Duration(in TUs), if specified, will be used to set dwell times.\n");
+@@ -2900,7 +3037,16 @@ static int handle_start_sched_scan(struct nl80211_state *state,
+ 				   struct nl_msg *msg,
+ 				   int argc, char **argv, enum id_input id)
+ {
+-	return parse_sched_scan(msg, &argc, &argv);
++	struct nlattr *tb[NL80211_ATTR_MAX + 1];
++	int ifindex = -1;
++
++	nla_parse(tb, NL80211_ATTR_MAX,
++		  genlmsg_attrdata(nlmsg_data(nlmsg_hdr(msg)), 0),
++		  genlmsg_attrlen(nlmsg_data(nlmsg_hdr(msg)), 0), NULL);
++	if (tb[NL80211_ATTR_IFINDEX])
++		ifindex = (int)nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
++
++	return parse_sched_scan(state, ifindex, msg, &argc, &argv);
+ }
+ 
+ static int handle_stop_sched_scan(struct nl80211_state *state,
+diff --git a/util.c b/util.c
+index 837e342..ccac89e 100644
+--- a/util.c
++++ b/util.c
+@@ -2579,3 +2579,254 @@ usage:
+ nla_put_failure:
+ 	return -ENOBUFS;
+ }
++
++/* Maximum number of frequencies we collect per band query */
++#define GET_BAND_FREQS_MAX 256
++
++struct band_freqs_cb_arg {
++	enum nl80211_band band;
++	uint32_t *freqs;
++	int count;
++	int max;
++};
++
++static int band_freqs_finish_handler(struct nl_msg *msg, void *arg)
++{
++	int *ret = arg;
++	*ret = 0;
++	return NL_SKIP;
++}
++
++static int band_freqs_ack_handler(struct nl_msg *msg, void *arg)
++{
++	int *ret = arg;
++	*ret = 0;
++	return NL_STOP;
++}
++
++static int band_freqs_error_handler(struct sockaddr_nl *nla,
++				    struct nlmsgerr *err, void *arg)
++{
++	int *ret = arg;
++	*ret = err->error;
++	return NL_STOP;
++}
++
++/*
++ * Collect the wiphy index and protocol-features flags from a
++ * GET_INTERFACE or GET_PROTOCOL_FEATURES response.
++ */
++struct band_freqs_wiphy_arg {
++	uint32_t wiphy_idx;
++	bool     has_wiphy;
++	bool     has_split_dump;
++};
++
++static int band_freqs_iface_handler(struct nl_msg *msg, void *arg)
++{
++	struct band_freqs_wiphy_arg *ctx = arg;
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++	struct nlattr *tb[NL80211_ATTR_MAX + 1];
++
++	nla_parse(tb, NL80211_ATTR_MAX,
++		  genlmsg_attrdata(gnlh, 0), genlmsg_attrlen(gnlh, 0), NULL);
++
++	if (tb[NL80211_ATTR_WIPHY]) {
++		ctx->wiphy_idx = nla_get_u32(tb[NL80211_ATTR_WIPHY]);
++		ctx->has_wiphy = true;
++	}
++	return NL_SKIP;
++}
++
++static int band_freqs_feat_handler(struct nl_msg *msg, void *arg)
++{
++	struct band_freqs_wiphy_arg *ctx = arg;
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++	struct nlattr *tb[NL80211_ATTR_MAX + 1];
++
++	nla_parse(tb, NL80211_ATTR_MAX,
++		  genlmsg_attrdata(gnlh, 0), genlmsg_attrlen(gnlh, 0), NULL);
++
++	if (tb[NL80211_ATTR_PROTOCOL_FEATURES]) {
++		uint32_t feat = nla_get_u32(tb[NL80211_ATTR_PROTOCOL_FEATURES]);
++		if (feat & NL80211_PROTOCOL_FEATURE_SPLIT_WIPHY_DUMP)
++			ctx->has_split_dump = true;
++	}
++	return NL_SKIP;
++}
++
++static int band_freqs_handler(struct nl_msg *msg, void *arg)
++{
++	struct band_freqs_cb_arg *ctx = arg;
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++	struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
++	struct nlattr *tb_band[NL80211_BAND_ATTR_MAX + 1];
++	struct nlattr *tb_freq[NL80211_FREQUENCY_ATTR_MAX + 1];
++	static struct nla_policy freq_policy[NL80211_FREQUENCY_ATTR_MAX + 1] = {
++		[NL80211_FREQUENCY_ATTR_FREQ]     = { .type = NLA_U32 },
++		[NL80211_FREQUENCY_ATTR_DISABLED] = { .type = NLA_FLAG },
++	};
++	struct nlattr *nl_band, *nl_freq;
++	int rem_band, rem_freq;
++
++	nla_parse(tb_msg, NL80211_ATTR_MAX,
++		  genlmsg_attrdata(gnlh, 0), genlmsg_attrlen(gnlh, 0), NULL);
++
++	if (!tb_msg[NL80211_ATTR_WIPHY_BANDS])
++		return NL_SKIP;
++
++	nla_for_each_nested(nl_band, tb_msg[NL80211_ATTR_WIPHY_BANDS], rem_band) {
++		if ((enum nl80211_band)nl_band->nla_type != ctx->band)
++			continue;
++
++		nla_parse(tb_band, NL80211_BAND_ATTR_MAX,
++			  nla_data(nl_band), nla_len(nl_band), NULL);
++
++		if (!tb_band[NL80211_BAND_ATTR_FREQS])
++			continue;
++
++		nla_for_each_nested(nl_freq, tb_band[NL80211_BAND_ATTR_FREQS], rem_freq) {
++			uint32_t freq;
++
++			nla_parse(tb_freq, NL80211_FREQUENCY_ATTR_MAX,
++				  nla_data(nl_freq), nla_len(nl_freq), freq_policy);
++
++			if (!tb_freq[NL80211_FREQUENCY_ATTR_FREQ])
++				continue;
++			if (tb_freq[NL80211_FREQUENCY_ATTR_DISABLED])
++				continue;
++
++			freq = nla_get_u32(tb_freq[NL80211_FREQUENCY_ATTR_FREQ]);
++			if (ctx->count < ctx->max)
++				ctx->freqs[ctx->count++] = freq;
++		}
++	}
++
++	return NL_SKIP;
++}
++
++/* Helper: send one netlink message and collect responses via cb. */
++static int band_freqs_send_recv(struct nl80211_state *state,
++				struct nl_msg *msg, struct nl_cb *cb)
++{
++	int err;
++
++	err = nl_send_auto_complete(state->nl_sock, msg);
++	if (err < 0)
++		return err;
++
++	err = 1;
++	nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, band_freqs_finish_handler, &err);
++	nl_cb_set(cb, NL_CB_ACK,    NL_CB_CUSTOM, band_freqs_ack_handler,    &err);
++	nl_cb_err(cb, NL_CB_CUSTOM, band_freqs_error_handler, &err);
++
++	while (err > 0)
++		nl_recvmsgs(state->nl_sock, cb);
++
++	return err;
++}
++
++int get_band_freqs(struct nl80211_state *state, int ifindex,
++		   enum nl80211_band band,
++		   uint32_t *freqs, int max_freqs)
++{
++	struct band_freqs_wiphy_arg wctx = { .has_wiphy = false,
++					     .has_split_dump = false };
++	struct band_freqs_cb_arg fctx = {
++		.band  = band,
++		.freqs = freqs,
++		.count = 0,
++		.max   = max_freqs,
++	};
++	struct nl_msg *msg;
++	struct nl_cb *cb;
++	int err;
++
++	cb = nl_cb_alloc(NL_CB_DEFAULT);
++	if (!cb)
++		return -ENOMEM;
++
++	/* ----------------------------------------------------------------
++	 * Step 1: GET_INTERFACE to resolve ifindex -> wiphy index.
++	 * This mirrors how __handle_cmd() puts NL80211_ATTR_WIPHY for
++	 * CIB_PHY commands; GET_WIPHY must be keyed by wiphy index.
++	 * ---------------------------------------------------------------- */
++	msg = nlmsg_alloc();
++	if (!msg) { err = -ENOMEM; goto out_cb; }
++
++	if (!genlmsg_put(msg, 0, 0, state->nl80211_id, 0, 0,
++			 NL80211_CMD_GET_INTERFACE, 0)) {
++		err = -ENOBUFS; goto out_msg;
++	}
++	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, ifindex);
++
++	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, band_freqs_iface_handler, &wctx);
++	err = band_freqs_send_recv(state, msg, cb);
++	nlmsg_free(msg);
++	msg = NULL;
++
++	if (err < 0 || !wctx.has_wiphy)
++		goto out_cb;
++
++	/* ----------------------------------------------------------------
++	 * Step 2: GET_PROTOCOL_FEATURES to check split-wiphy-dump support.
++	 * Mirrors handle_info() calling "features -q" before GET_WIPHY.
++	 * ---------------------------------------------------------------- */
++	msg = nlmsg_alloc();
++	if (!msg) { err = -ENOMEM; goto out_cb; }
++
++	if (!genlmsg_put(msg, 0, 0, state->nl80211_id, 0, 0,
++			 NL80211_CMD_GET_PROTOCOL_FEATURES, 0)) {
++		err = -ENOBUFS; goto out_msg;
++	}
++
++	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, band_freqs_feat_handler, &wctx);
++	err = band_freqs_send_recv(state, msg, cb);
++	nlmsg_free(msg);
++	msg = NULL;
++
++	if (err < 0)
++		goto out_cb;
++
++	/* ----------------------------------------------------------------
++	 * Step 3: GET_WIPHY keyed by wiphy index.
++	 * Use NLM_F_DUMP + SPLIT_WIPHY_DUMP when the kernel supports it
++	 * (required for 6 GHz — the kernel splits band data across
++	 * multiple responses and only sends 6 GHz in the extra messages).
++	 * ---------------------------------------------------------------- */
++	msg = nlmsg_alloc();
++	if (!msg) { err = -ENOMEM; goto out_cb; }
++
++	if (wctx.has_split_dump) {
++		if (!genlmsg_put(msg, 0, 0, state->nl80211_id, 0,
++				 NLM_F_DUMP, NL80211_CMD_GET_WIPHY, 0)) {
++			err = -ENOBUFS; goto out_msg;
++		}
++		NLA_PUT_FLAG(msg, NL80211_ATTR_SPLIT_WIPHY_DUMP);
++	} else {
++		if (!genlmsg_put(msg, 0, 0, state->nl80211_id, 0,
++				 0, NL80211_CMD_GET_WIPHY, 0)) {
++			err = -ENOBUFS; goto out_msg;
++		}
++	}
++	NLA_PUT_U32(msg, NL80211_ATTR_WIPHY, wctx.wiphy_idx);
++
++	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, band_freqs_handler, &fctx);
++	err = band_freqs_send_recv(state, msg, cb);
++	nlmsg_free(msg);
++	msg = NULL;
++
++	if (err < 0)
++		goto out_cb;
++
++	nl_cb_put(cb);
++	return fctx.count;
++
++nla_put_failure:
++	err = -ENOBUFS;
++out_msg:
++	nlmsg_free(msg);
++out_cb:
++	nl_cb_put(cb);
++	return err;
++}
+diff --git a/wowlan.c b/wowlan.c
+index 778c0db..8c74ee7 100644
+--- a/wowlan.c
++++ b/wowlan.c
+@@ -185,7 +185,8 @@ static int wowlan_parse_tcp_file(struct nl_msg *msg, const char *fn)
+ 	return err;
+ }
+ 
+-static int wowlan_parse_net_detect(struct nl_msg *msg, int *argc, char ***argv)
++static int wowlan_parse_net_detect(struct nl80211_state *state, int ifindex,
++				   struct nl_msg *msg, int *argc, char ***argv)
+ {
+ 	struct nlattr *nd;
+ 	int err = 0;
+@@ -194,7 +195,7 @@ static int wowlan_parse_net_detect(struct nl_msg *msg, int *argc, char ***argv)
+ 	if (!nd)
+ 		return -ENOBUFS;
+ 
+-	err = parse_sched_scan(msg, argc, argv);
++	err = parse_sched_scan(state, ifindex, msg, argc, argv);
+ 
+ 	nla_nest_end(msg, nd);
+ 
+@@ -262,7 +263,18 @@ static int handle_wowlan_enable(struct nl80211_state *state,
+ 					err = 1;
+ 					goto nla_put_failure;
+ 				}
+-				err = wowlan_parse_net_detect(msg, &argc, &argv);
++				{
++					struct nlattr *tb[NL80211_ATTR_MAX + 1];
++					int ifindex = -1;
++
++					nla_parse(tb, NL80211_ATTR_MAX,
++						  genlmsg_attrdata(nlmsg_data(nlmsg_hdr(msg)), 0),
++						  genlmsg_attrlen(nlmsg_data(nlmsg_hdr(msg)), 0), NULL);
++					if (tb[NL80211_ATTR_IFINDEX])
++						ifindex = (int)nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
++
++					err = wowlan_parse_net_detect(state, ifindex, msg, &argc, &argv);
++				}
+ 				if (err)
+ 					goto nla_put_failure;
+ 				continue;
+-- 
+2.34.1
+

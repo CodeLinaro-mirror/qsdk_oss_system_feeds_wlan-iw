@@ -1,0 +1,78 @@
+From f96bfe5784974a2c2159b3c254ad6d550c00a343 Mon Sep 17 00:00:00 2001
+From: Gautham Kumar Senthilkumaran <gauthamk@qti.qualcomm.com>
+Date: Thu, 6 Aug 2026 19:40:35 +0530
+Subject: [PATCH] QSDK:CP: iw: Reject commands during ath12k recovery
+
+Currently, iw has no visibility into whether the underlying
+ath12k device is mid-SSR recovery, so commands can be issued
+against a device that is being torn down and recreated,
+hanging or failing unpredictably instead of returning an
+immediate, well-defined error.
+
+Add iw_recovery_in_progress(), which globs
+/sys/kernel/debug/ath12k/*/recovery_in_progress and checks
+each SoC's flag. Call it in __handle_cmd() right after device
+index resolution, returning -EBUSY instead of proceeding when
+recovery is in progress. Device-agnostic commands (iw list,
+iw event) do not reach __handle_cmd() and are unaffected.
+
+Patch-dependency: None
+
+Signed-off-by: Gautham Kumar Senthilkumaran <gauthamk@qti.qualcomm.com>
+
+--- a/iw.c
++++ b/iw.c
+@@ -13,6 +13,7 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <stdbool.h>
++#include <glob.h>
+ #include <linux/netlink.h>
+ 
+ #include <netlink/genl/genl.h>
+@@ -257,6 +258,33 @@ static void version(void)
+ 	printf("iw version %s\n", iw_version);
+ }
+ 
++static int iw_recovery_in_progress(void)
++{
++	glob_t g;
++	size_t i;
++	FILE *fp;
++	int found = 0;
++	char val;
++
++	if (glob("/sys/kernel/debug/ath12k/*/recovery_in_progress",
++		 0, NULL, &g) != 0)
++		return 0;
++
++	for (i = 0; i < g.gl_pathc; i++) {
++		fp = fopen(g.gl_pathv[i], "r");
++		if (!fp)
++			continue;
++		if (fread(&val, 1, 1, fp) == 1 && val == '1')
++			found = 1;
++		fclose(fp);
++		if (found)
++			break;
++	}
++
++	globfree(&g);
++	return found;
++}
++
+ static int phy_lookup(char *name)
+ {
+ 	char buf[200];
+@@ -411,6 +439,11 @@ static int __handle_cmd(struct nl80211_s
+ 	if (devidx < 0)
+ 		return -errno;
+ 
++	if (iw_recovery_in_progress()) {
++		fprintf(stderr, "ath12k recovery in progress, command rejected\n");
++		return -EBUSY;
++	}
++
+ 	section = *argv;
+ 	argc--;
+ 	argv++;
