@@ -1,0 +1,85 @@
+From f25cd2b447148e20bb0cb4885e8d77541e6fbe20 Mon Sep 17 00:00:00 2001
+From: Priyadarshnee Srinivasan <priys@qti.qualcomm.com>
+Date: Thu, 17 Sep 2026 10:04:02 +0530
+Subject: [PATCH] QSDK:PROTOCOL:iw: Display PSC flag in 6 GHz channel listing
+
+Show Preferred Scanning Channel (PSC) information in the output of
+the "iw phy <phyname> channels" command.
+Add a userspace helper, is_6ghz_psc_channel(), to determine PSC
+status from the channel center frequency reported through the
+GET_WIPHY response. A channel is identified as a PSC channel when
+its channel number satisfies the PSC spacing defined for the 6 GHz
+channel band.
+This allows users to easily identify PSC channels when debugging
+6 GHz scanning behavior, channel configuration, and deployment
+issues without requiring any kernel or nl80211 changes.
+
+Sample output:
+* 6935 MHz [197]
+  Maximum TX power: 30.0 dBm
+  PSC
+  Channel widths: 20MHz HE40 EHT40 HE80 EHT80 HE160 EHT160 EHT320
+  Supported power modes: LPI VLP
+  LPI Tx power: 30.0 dBm
+  VLP Tx power: 14.0 dBm
+
+Feature: REGULATORY
+Patch-dependency: None
+
+Change-Id: I392dbef37884853c50bf34698b9bbc2377967d81
+Signed-off-by: Priyadarshnee Srinivasan <priys@qti.qualcomm.com>
+---
+ phy.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/phy.c b/phy.c
+index e548d7a..52c30bb 100644
+--- a/phy.c
++++ b/phy.c
+@@ -17,6 +17,33 @@
+ 
+ SECTION(add);
+ 
++#define FREQ_6GHZ_MIN		5955
++#define FREQ_6GHZ_MAX		7115
++#define FREQ_6GHZ_BASE		5950
++#define FREQ_6GHZ_CHAN_STEP	   5
++#define PSC_CHAN_START		   5
++#define PSC_CHAN_STEP		  16
++
++/*
++ * 6 GHz PSC (Preferred Scanning Channel) detection.
++ * Every 16th channel is a PSC channel starting at 5 and ending at 229.
++ * Therefore, a channel is PSC when (channel_number - 5) % 16 == 0, i.e.
++ * channels 5, 21, 37, 53, 69, 85, 101, 117, 133, 149, 165, 181, 197, 213, 229.
++ * No kernel attribute is required; the channel number is derived from
++ * the frequency already present in the nl80211 response.
++ */
++static bool is_6ghz_psc_channel(uint32_t freq)
++{
++	int chan;
++
++	if (freq < FREQ_6GHZ_MIN || freq > FREQ_6GHZ_MAX)
++		return false;
++	chan = (freq - FREQ_6GHZ_BASE) / FREQ_6GHZ_CHAN_STEP;
++	if (chan < PSC_CHAN_START)
++		return false;
++	return (chan - PSC_CHAN_START) % PSC_CHAN_STEP == 0;
++}
++
+ struct channels_ctx {
+ 	int last_band;
+ 	bool width_40;
+@@ -220,6 +247,9 @@ static int print_channels_handler(struct nl_msg *msg, void *arg)
+ 					if (tb_freq[NL80211_FREQUENCY_ATTR_RADAR])
+ 						printf("\t  Radar detection\n");
+ 
++					if (is_6ghz_psc_channel(freq))
++						printf("\t  PSC\n");
++
+ 					printf("\t  Channel widths:");
+ 					if (!tb_freq[NL80211_FREQUENCY_ATTR_NO_20MHZ])
+ 						printf(" 20MHz");
+-- 
+2.34.1
+
